@@ -1,0 +1,188 @@
+@authHost = http://localhost:8081
+@tasksHost = http://localhost:8082
+@analyticsHost = http://localhost:8083
+@token = paste_your_jwt_here
+@projectId = 1
+@taskId = 1
+@commentId = 1
+@attachmentId = 1
+@notificationId = 1
+
+### Register
+POST {{authHost}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "http_user",
+  "password": "password123",
+  "email": "http_user@example.com"
+}
+
+### Login
+POST {{authHost}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "http_user",
+  "password": "password123"
+}
+
+### Validate token
+GET {{authHost}}/api/auth/validate
+Authorization: Bearer {{token}}
+
+### My profile
+GET {{authHost}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Update profile
+PUT {{authHost}}/api/auth/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "http_user_updated",
+  "email": "http_user_updated@example.com"
+}
+
+### Change password
+PUT {{authHost}}/api/auth/me/password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "oldPassword": "password123",
+  "newPassword": "password1234",
+  "confirmationPhrase": "CONFIRM_PASSWORD_CHANGE"
+}
+
+### Users list
+GET {{authHost}}/api/users
+Authorization: Bearer {{token}}
+
+### Get projects
+GET {{tasksHost}}/api/projects
+Authorization: Bearer {{token}}
+
+### Create project
+POST {{tasksHost}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "HTTP Project",
+  "description": "Created from api.http"
+}
+
+### Get project by id
+GET {{tasksHost}}/api/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Update project
+PUT {{tasksHost}}/api/projects/{{projectId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "HTTP Project Updated",
+  "description": "Updated from api.http"
+}
+
+### Delete project
+DELETE {{tasksHost}}/api/projects/{{projectId}}
+Authorization: Bearer {{token}}
+
+### Get tasks with filters
+GET {{tasksHost}}/api/tasks?projectId={{projectId}}&status=OPEN&page=0&size=20
+Authorization: Bearer {{token}}
+
+### Create task
+POST {{tasksHost}}/api/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "projectId": {{projectId}},
+  "title": "HTTP Task",
+  "description": "Task created via api.http",
+  "status": "OPEN",
+  "assigneeId": 1,
+  "dueDate": null
+}
+
+### Get task by id
+GET {{tasksHost}}/api/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Update task
+PUT {{tasksHost}}/api/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "projectId": {{projectId}},
+  "title": "HTTP Task Updated",
+  "description": "Task updated via api.http",
+  "status": "IN_PROGRESS",
+  "assigneeId": 1,
+  "dueDate": null
+}
+
+### Delete task
+DELETE {{tasksHost}}/api/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Get comments
+GET {{tasksHost}}/api/tasks/{{taskId}}/comments
+Authorization: Bearer {{token}}
+
+### Add comment
+POST {{tasksHost}}/api/tasks/{{taskId}}/comments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "text": "Comment from api.http"
+}
+
+### Delete comment
+DELETE {{tasksHost}}/api/tasks/{{taskId}}/comments/{{commentId}}
+Authorization: Bearer {{token}}
+
+### Get attachments
+GET {{tasksHost}}/api/tasks/{{taskId}}/attachments
+Authorization: Bearer {{token}}
+
+### Add attachment
+POST {{tasksHost}}/api/tasks/{{taskId}}/attachments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "filePathOrUrl": "https://example.com/spec.pdf",
+  "fileName": "spec.pdf"
+}
+
+### Delete attachment
+DELETE {{tasksHost}}/api/tasks/{{taskId}}/attachments/{{attachmentId}}
+Authorization: Bearer {{token}}
+
+### Task history
+GET {{tasksHost}}/api/tasks/{{taskId}}/history?limit=50
+Authorization: Bearer {{token}}
+
+### Notifications list
+GET {{analyticsHost}}/api/notifications?read=false&limit=20
+Authorization: Bearer {{token}}
+
+### Unread notifications count
+GET {{analyticsHost}}/api/notifications/unread
+Authorization: Bearer {{token}}
+
+### Mark notification as read
+PATCH {{analyticsHost}}/api/notifications/{{notificationId}}/read
+Authorization: Bearer {{token}}
+
+### Report summary
+GET {{analyticsHost}}/api/reports/summary
+Authorization: Bearer {{token}}

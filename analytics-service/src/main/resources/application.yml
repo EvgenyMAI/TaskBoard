@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: analytics-service
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:taskboard_analytics}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+server:
+  port: ${PORT:8083}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:taskboard-auth-secret-key-min-256-bits-for-hs256}
+  notifications:
+    internal-key: ${NOTIFICATIONS_INTERNAL_KEY:taskboard-internal-key}
+
+logging:
+  file:
+    name: ${LOG_FILE:./logs/analytics-service/analytics-service.log}
+  level:
+    root: ${LOG_LEVEL:INFO}
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.web.servlet.handler.HandlerMappingIntrospector: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [rid=%X{requestId:-}] [uid=%X{userId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [rid=%X{requestId:-}] [uid=%X{userId:-}] %logger{36} - %msg%n"
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 14
+      total-size-cap: 1GB

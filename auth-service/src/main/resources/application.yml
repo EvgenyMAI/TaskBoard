@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:taskboard_auth}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+server:
+  port: ${PORT:8081}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:taskboard-auth-secret-key-min-256-bits-for-hs256}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+logging:
+  file:
+    name: ${LOG_FILE:./logs/auth-service/auth-service.log}
+  level:
+    root: ${LOG_LEVEL:INFO}
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.web.servlet.handler.HandlerMappingIntrospector: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [rid=%X{requestId:-}] [uid=%X{userId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [rid=%X{requestId:-}] [uid=%X{userId:-}] %logger{36} - %msg%n"
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 14
+      total-size-cap: 1GB

@@ -1,0 +1,23 @@
+# Build
+target/
+*.jar
+*.war
+node_modules/
+dist/
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

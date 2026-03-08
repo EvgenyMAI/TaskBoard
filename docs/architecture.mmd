@@ -1,0 +1,41 @@
+flowchart LR
+    U[User]
+    FE[Frontend React Vite<br/>localhost 3000]
+
+    subgraph BACKEND[Backend services]
+        direction LR
+        AUTH[auth-service<br/>localhost 8081]
+        TASKS[tasks-service<br/>localhost 8082]
+        ANALYTICS[analytics-service<br/>localhost 8083]
+    end
+
+    subgraph DATA[PostgreSQL]
+        direction LR
+        DBA[(taskboard_auth)]
+        DBT[(taskboard_tasks)]
+        DBN[(taskboard_analytics)]
+    end
+
+    U -->|UI| FE
+    FE -->|login register profile| AUTH
+    FE -->|projects tasks CRUD| TASKS
+    FE -->|notifications reports| ANALYTICS
+
+    AUTH -->|JPA| DBA
+    TASKS -->|JPA| DBT
+    ANALYTICS -->|JPA| DBN
+
+    TASKS -->|internal notifications with key| ANALYTICS
+    AUTH -->|JWT token| FE
+    FE -->|Bearer JWT| TASKS
+    FE -->|Bearer JWT| ANALYTICS
+
+    classDef user fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#0F172A;
+    classDef frontend fill:#E0F2FE,stroke:#0284C7,stroke-width:2px,color:#0F172A;
+    classDef service fill:#ECFDF5,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    classDef db fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#0F172A;
+
+    class U user;
+    class FE frontend;
+    class AUTH,TASKS,ANALYTICS service;
+    class DBA,DBT,DBN db;

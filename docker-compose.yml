@@ -1,0 +1,113 @@
+services:
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_AUTH_DB:-taskboard_auth}
+      POSTGRES_USER: ${POSTGRES_AUTH_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_AUTH_PORT:-5432}:5432"
+    volumes:
+      - pg_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-tasks:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_TASKS_DB:-taskboard_tasks}
+      POSTGRES_USER: ${POSTGRES_TASKS_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_TASKS_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_TASKS_PORT:-5433}:5432"
+    volumes:
+      - pg_tasks_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-analytics:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_ANALYTICS_DB:-taskboard_analytics}
+      POSTGRES_USER: ${POSTGRES_ANALYTICS_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ANALYTICS_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_ANALYTICS_PORT:-5434}:5432"
+    volumes:
+      - pg_analytics_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ANALYTICS_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT:-8081}:8081"
+    volumes:
+      - ./logs/auth-service:/app/logs
+    environment:
+      POSTGRES_HOST: postgres-auth
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_AUTH_DB:-taskboard_auth}
+      POSTGRES_USER: ${POSTGRES_AUTH_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-taskboard-auth-secret-key-min-256-bits-for-hs256}
+      LOG_FILE: /app/logs/auth-service.log
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+
+  tasks-service:
+    build: ./tasks-service
+    ports:
+      - "${TASKS_SERVICE_PORT:-8082}:8082"
+    volumes:
+      - ./logs/tasks-service:/app/logs
+    environment:
+      POSTGRES_HOST: postgres-tasks
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_TASKS_DB:-taskboard_tasks}
+      POSTGRES_USER: ${POSTGRES_TASKS_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_TASKS_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-taskboard-auth-secret-key-min-256-bits-for-hs256}
+      ANALYTICS_BASE_URL: http://analytics-service:8083
+      NOTIFICATIONS_INTERNAL_KEY: ${NOTIFICATIONS_INTERNAL_KEY:-taskboard-internal-key}
+      LOG_FILE: /app/logs/tasks-service.log
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres-tasks:
+        condition: service_healthy
+
+  analytics-service:
+    build: ./analytics-service
+    ports:
+      - "${ANALYTICS_SERVICE_PORT:-8083}:8083"
+    volumes:
+      - ./logs/analytics-service:/app/logs
+    environment:
+      POSTGRES_HOST: postgres-analytics
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_ANALYTICS_DB:-taskboard_analytics}
+      POSTGRES_USER: ${POSTGRES_ANALYTICS_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ANALYTICS_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-taskboard-auth-secret-key-min-256-bits-for-hs256}
+      NOTIFICATIONS_INTERNAL_KEY: ${NOTIFICATIONS_INTERNAL_KEY:-taskboard-internal-key}
+      LOG_FILE: /app/logs/analytics-service.log
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres-analytics:
+        condition: service_healthy
+
+volumes:
+  pg_auth_data:
+  pg_tasks_data:
+  pg_analytics_data:
