@@ -15,6 +15,11 @@ export function authHeaders() {
   };
 }
 
+function authOnlyHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 // ——— Auth ———
 export async function login(username, password) {
   const res = await fetch(`${AUTH_API}/login`, {
@@ -238,13 +243,20 @@ export async function getAttachments(taskId) {
   return res.json();
 }
 
-export async function addAttachment(taskId, filePathOrUrl, fileName) {
-  const res = await fetch(`${TASKS_API}/tasks/${taskId}/attachments`, {
+export async function uploadAttachmentFile(taskId, file) {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${TASKS_API}/tasks/${taskId}/attachments/upload`, {
     method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ filePathOrUrl, fileName: fileName || filePathOrUrl }),
+    headers: authOnlyHeaders(),
+    body: form,
   });
-  if (!res.ok) throw new Error('Не удалось добавить вложение');
+  if (!res.ok) {
+    if (res.status === 413) {
+      throw new Error('Файл слишком большой. Максимум: 25 МБ');
+    }
+    throw new Error('Не удалось загрузить файл');
+  }
   return res.json();
 }
 
@@ -254,6 +266,21 @@ export async function deleteAttachment(taskId, attachmentId) {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error('Не удалось удалить вложение');
+}
+
+export async function getAttachmentBlob(taskId, attachmentId, { preview = false } = {}) {
+  const endpoint = preview ? 'preview' : 'download';
+  const res = await fetch(`${TASKS_API}/tasks/${taskId}/attachments/${attachmentId}/${endpoint}`, {
+    headers: authOnlyHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error('Не удалось получить файл');
+  }
+  const blob = await res.blob();
+  return {
+    blob,
+    contentType: res.headers.get('content-type') || 'application/octet-stream',
+  };
 }
 
 // ——— Task history ———

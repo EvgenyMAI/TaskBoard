@@ -47,6 +47,18 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
   auth-service:
     build: ./auth-service
     ports:
@@ -81,11 +93,17 @@ services:
       JWT_SECRET: ${JWT_SECRET:-taskboard-auth-secret-key-min-256-bits-for-hs256}
       ANALYTICS_BASE_URL: http://analytics-service:8083
       NOTIFICATIONS_INTERNAL_KEY: ${NOTIFICATIONS_INTERNAL_KEY:-taskboard-internal-key}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-taskboard-attachments}
       LOG_FILE: /app/logs/tasks-service.log
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       postgres-tasks:
         condition: service_healthy
+      minio:
+        condition: service_started
 
   analytics-service:
     build: ./analytics-service
@@ -111,3 +129,4 @@ volumes:
   pg_auth_data:
   pg_tasks_data:
   pg_analytics_data:
+  minio_data:
