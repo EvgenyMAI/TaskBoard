@@ -14,6 +14,8 @@
 - полный цикл задач (создание, фильтрация, изменение статуса, назначение исполнителя);
 - комментарии, вложения и история изменений задач;
 - уведомления в интерфейсе и отдельная страница уведомлений;
+- ролевая модель доступа (`ADMIN`, `MANAGER`, `EXECUTOR`) и управление ролями через UI;
+- управление участниками проекта (invite/remove) через UI и отдельную таблицу membership;
 - базовые отчеты и backend-логи для отладки.
 
 Система развернута как набор отдельных сервисов и БД в Docker.
@@ -97,7 +99,8 @@
 - `GET /api/auth/me` — профиль текущего пользователя;
 - `PUT /api/auth/me` — обновление username/email;
 - `PUT /api/auth/me/password` — смена пароля с валидацией;
-- `GET /api/users` — список пользователей для назначения задач.
+- `GET /api/users` — список пользователей для назначения задач;
+- `PUT /api/auth/users/{id}/roles` — обновление ролей пользователя (только `ADMIN`).
 
 ### 4.3 Tasks Service
 
@@ -108,6 +111,9 @@
 - `POST /api/projects`
 - `PUT /api/projects/{id}`
 - `DELETE /api/projects/{id}`
+- `GET /api/projects/{id}/members`
+- `POST /api/projects/{id}/members`
+- `DELETE /api/projects/{id}/members/{userId}`
 
 Задачи:
 
@@ -155,6 +161,10 @@
 
 - JWT-аутентификация для защищенных endpoint;
 - пароли хранятся в виде BCrypt-хеша;
+- RBAC по ролям `ADMIN` / `MANAGER` / `EXECUTOR` (роли включены в JWT и применяются во всех сервисах);
+- первый зарегистрированный пользователь получает роль `ADMIN` (bootstrap-сценарий), последующие — `EXECUTOR`;
+- права видимости/действий по проектам и задачам проверяются на backend и дублируются ограничениями UI;
+- участие в проекте определяется таблицей `project_members` (отдельно от назначения задач);
 - пользователь не может читать чужие уведомления (фильтрация по `userId` из токена);
 - в публичном создании уведомлений `userId` берется из аутентификации, не из тела запроса;
 - внутренние уведомления между сервисами защищены `NOTIFICATIONS_INTERNAL_KEY`.
@@ -247,6 +257,7 @@ npm run dev
   - Страница проектов: [docs/screenshots/03-projects-create.png](docs/screenshots/03-projects-create.png)
   - Создание проекта: [docs/screenshots/04-projects-create.png](docs/screenshots/04-projects-create.png)
   - Управление проектом: [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
+  - Добавление/удаление участников проекта: [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
 </details>
 
 <details>
@@ -285,6 +296,7 @@ npm run dev
 
   - Страница профиля: [docs/screenshots/17-profile.png](docs/screenshots/17-profile.png)
   - Профиль после обновления: [docs/screenshots/18-profile.png](docs/screenshots/18-profile.png)
+  - Для `ADMIN`: управление ролями пользователей на странице профиля
 </details>
 
 ---
@@ -326,7 +338,6 @@ Frontend (`frontend/.env`):
 
 ## 11. Что можно улучшать дальше
 
-- роли и более детальная авторизация по операциям;
 - реальная загрузка/хранение файлов вложений;
 - расширение отчетности на основе фактических данных tasks-service;
 - WebSocket/SSE для realtime-уведомлений вместо polling;
