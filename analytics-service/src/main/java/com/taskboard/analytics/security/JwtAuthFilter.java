@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.Objects;
 
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -28,9 +29,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String jwt = getJwtFromRequest(request);
         if (StringUtils.hasText(jwt) && jwtConfig.validateToken(jwt)) {
             Long userId = jwtConfig.getUserIdFromToken(jwt);
-            List<SimpleGrantedAuthority> authorities = Stream.of("ROLE_USER")
-                    .map(SimpleGrantedAuthority::new)
-                    .collect(Collectors.toList());
+            List<String> roles = jwtConfig.getRolesFromToken(jwt);
+            List<SimpleGrantedAuthority> authorities;
+            if (roles == null || roles.isEmpty()) {
+                authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+            } else {
+                authorities = roles.stream()
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .map(role -> "ROLE_" + role)
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+            }
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(userId, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(auth);

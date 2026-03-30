@@ -7,7 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.stream.Collectors;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/users")
@@ -26,6 +28,9 @@ public class UserController {
     }
 
     private static UserSummaryDto toSummary(User u) {
-        return new UserSummaryDto(u.getId(), u.getUsername());
+        Set<String> roles = u.getRoles().stream()
+                .map(r -> r.getName().name())
+                .collect(Collectors.toSet());
+        return new UserSummaryDto(u.getId(), u.getUsername(), roles);
     }
 }

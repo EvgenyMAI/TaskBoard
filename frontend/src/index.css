@@ -138,12 +138,44 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 .task-list-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
 }
 .task-list-item-main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
 .task-title { font-weight: 500; }
 .task-title:hover { color: #a78bfa; }
+.task-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.task-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.task-item-header .task-title {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.meta-chip {
+  font-size: 0.82rem;
+  color: #c4c8d1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  line-height: 1.3;
+}
 .badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
@@ -367,6 +399,31 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
     transform: translateY(0);
   }
 }
+
+/* Role management (Profile -> ADMIN) */
+.role-management {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.role-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.role-row:last-child { border-bottom: none; }
+.role-row-user {
+  flex: 1;
+  min-width: 0;
+}
+.role-row select {
+  min-width: 170px;
+}
+
 @media (max-width: 860px) {
   .nav { flex-wrap: wrap; gap: 0.6rem; }
   .nav-toggle { display: inline-flex; }

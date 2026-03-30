@@ -2,8 +2,11 @@ package com.taskboard.tasks.controller;
 
 import com.taskboard.tasks.entity.Comment;
 import com.taskboard.tasks.repository.CommentRepository;
+import com.taskboard.tasks.repository.ProjectMemberRepository;
 import com.taskboard.tasks.repository.TaskRepository;
+import com.taskboard.tasks.security.RoleAuthorization;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -22,19 +25,41 @@ public class CommentController {
 
     private final CommentRepository commentRepository;
     private final TaskRepository taskRepository;
+    private final ProjectMemberRepository projectMemberRepository;
 
     @GetMapping
-    public List<Comment> list(@PathVariable Long taskId) {
-        return commentRepository.findByTaskIdOrderByCreatedAtAsc(taskId);
+    public ResponseEntity<List<Comment>> list(@PathVariable Long taskId, Authentication auth) {
+        Long userId = RoleAuthorization.userId(auth);
+        boolean isExecutor = RoleAuthorization.isExecutor(auth);
+
+        return taskRepository.findByIdWithProject(taskId)
+                .map(task -> {
+                    if (isExecutor) {
+                        Long taskProjectId = task.getProjectId();
+                        boolean isMember = taskProjectId != null
+                                && projectMemberRepository.existsByIdProjectIdAndIdUserId(taskProjectId, userId);
+                        if (!isMember) return ResponseEntity.ok(List.<Comment>of());
+                    }
+                    return ResponseEntity.ok(commentRepository.findByTaskIdOrderByCreatedAtAsc(taskId));
+                })
+                .orElse(ResponseEntity.<List<Comment>>notFound().build());
     }
 
     @PostMapping
     public ResponseEntity<Comment> create(@PathVariable Long taskId,
                                           @Valid @RequestBody CommentDto dto,
                                           Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
-        return taskRepository.findById(taskId)
+        Long userId = RoleAuthorization.userId(auth);
+        boolean isExecutor = RoleAuthorization.isExecutor(auth);
+
+        return taskRepository.findByIdWithProject(taskId)
                 .map(task -> {
+                    if (isExecutor) {
+                        Long taskProjectId = task.getProjectId();
+                        boolean isMember = taskProjectId != null
+                                && projectMemberRepository.existsByIdProjectIdAndIdUserId(taskProjectId, userId);
+                        if (!isMember) return ResponseEntity.status(HttpStatus.FORBIDDEN).<Comment>build();
+                    }
                     Comment comment = Comment.builder()
                             .text(dto.getText())
                             .authorId(userId)
@@ -47,8 +72,22 @@ public class CommentController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long taskId, @PathVariable Long id) {
-        if (!commentRepository.existsById(id)) return ResponseEntity.notFound().build();
+    public ResponseEntity<Void> delete(@PathVariable Long taskId, @PathVariable Long id, Authentication auth) {
+        Long userId = RoleAuthorization.userId(auth);
+        boolean isExecutor = RoleAuthorization.isExecutor(auth);
+        Comment comment = commentRepository.findById(id).orElse(null);
+        if (comment == null) return ResponseEntity.notFound().build();
+
+        if (isExecutor) {
+            // Для безопасности EXECUTOR может удалять только свои комментарии.
+            if (comment.getAuthorId() == null || !comment.getAuthorId().equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            if (comment.getTask() != null && comment.getTask().getId() != null && !comment.getTask().getId().equals(taskId)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+        }
+
         commentRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

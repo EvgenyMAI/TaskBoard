@@ -81,6 +81,20 @@ export async function getUsers() {
   return res.json();
 }
 
+// ——— Roles (admin-only) ———
+export async function updateUserRoles(userId, roles) {
+  const res = await fetch(`${AUTH_API}/users/${userId}/roles`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ roles }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Не удалось обновить роли');
+  }
+  return res.json();
+}
+
 // ——— Projects ———
 export async function getProjects() {
   const res = await fetch(`${TASKS_API}/projects`, { headers: authHeaders() });
@@ -120,6 +134,33 @@ export async function deleteProject(id) {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error('Не удалось удалить проект');
+}
+
+// ——— Project members ———
+export async function getProjectMembers(projectId) {
+  const res = await fetch(`${TASKS_API}/projects/${projectId}/members`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Не удалось загрузить участников проекта');
+  return res.json();
+}
+
+export async function addProjectMember(projectId, userId) {
+  const res = await fetch(`${TASKS_API}/projects/${projectId}/members`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ userId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.details?.userId || 'Не удалось добавить участника');
+  }
+}
+
+export async function removeProjectMember(projectId, userId) {
+  const res = await fetch(`${TASKS_API}/projects/${projectId}/members/${userId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error('Не удалось удалить участника');
 }
 
 // ——— Tasks ———

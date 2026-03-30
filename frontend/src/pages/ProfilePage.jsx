@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { changeMyPassword, getMyProfile, updateMyProfile } from '../api';
+import { changeMyPassword, getMyProfile, getUsers, updateMyProfile, updateUserRoles } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import FormField from '../components/FormField';
 import Skeleton from '../components/Skeleton';
+import { roleLabel, roleLabels } from '../utils/roles';
 
 const PASSWORD_CHANGE_PHRASE = 'I_CONFIRM_PASSWORD_CHANGE';
 
@@ -26,6 +27,10 @@ export default function ProfilePage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [touched, setTouched] = useState({});
 
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [rolesSaving, setRolesSaving] = useState(false);
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const usernameError = username.trim().length < 2 ? 'Минимум 2 символа' : '';
   const emailError = !emailRegex.test(email.trim()) ? 'Введите корректный email' : '';
@@ -46,6 +51,43 @@ export default function ProfilePage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const isAdmin = profile?.roles?.includes('ADMIN');
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setUsersLoading(true);
+    getUsers()
+      .then((list) => setUsers(Array.isArray(list) ? list : []))
+      .catch((e) => setError(e.message))
+      .finally(() => setUsersLoading(false));
+  }, [isAdmin]);
+
+  const getPrimaryRole = (roles) => {
+    const r = Array.isArray(roles) ? roles : [];
+    if (r.includes('ADMIN')) return 'ADMIN';
+    if (r.includes('MANAGER')) return 'MANAGER';
+    return 'EXECUTOR';
+  };
+
+  const handleUpdateRoles = async (userId, nextRole) => {
+    if (!isAdmin) return;
+    setRolesSaving(true);
+    try {
+      await updateUserRoles(userId, [nextRole]);
+      toast.success('Роль пользователя обновлена');
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, roles: [nextRole] } : u)),
+      );
+      if (profile?.id === userId) {
+        toast.info('После смены собственной роли выполните выход и повторный вход, чтобы права обновились.');
+      }
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setRolesSaving(false);
+    }
+  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -117,7 +159,7 @@ export default function ProfilePage() {
         <div className="card">
           <h2>Профиль</h2>
           <p className="muted small">
-            Роли: {profile?.roles?.length ? profile.roles.join(', ') : '—'}
+            Роли: {profile?.roles?.length ? roleLabels(profile.roles).join(', ') : '—'}
           </p>
           <form onSubmit={handleSaveProfile}>
             <FormField label="Имя пользователя" error={touched.username && usernameError ? usernameError : ''}>
@@ -149,6 +191,38 @@ export default function ProfilePage() {
             </div>
           </form>
         </div>
+
+        {isAdmin && (
+          <div className="card">
+            <h2>Управление ролями</h2>
+            <p className="muted small">
+              Изменения ролей применяются после повторного входа (JWT).
+            </p>
+            {usersLoading ? (
+              <Skeleton style={{ height: 180 }} />
+            ) : (
+              <div className="role-management">
+                {users.map((u) => (
+                  <div key={u.id} className="role-row">
+                    <div className="role-row-user">
+                      <strong>{u.username}</strong>
+                      {profile?.id === u.id && <span className="muted small"> (вы)</span>}
+                    </div>
+                    <select
+                      disabled={rolesSaving}
+                      value={getPrimaryRole(u.roles)}
+                      onChange={(e) => handleUpdateRoles(u.id, e.target.value)}
+                    >
+                      <option value="EXECUTOR">{roleLabel('EXECUTOR')}</option>
+                      <option value="MANAGER">{roleLabel('MANAGER')}</option>
+                      <option value="ADMIN">{roleLabel('ADMIN')}</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="card">
           <h2>Смена пароля</h2>

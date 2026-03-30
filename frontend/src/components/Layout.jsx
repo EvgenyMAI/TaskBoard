@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getUnreadNotificationsCount } from '../api';
+import { roleLabels } from '../utils/roles';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -63,7 +64,7 @@ export default function Layout({ children }) {
           {navLink('/profile', 'Профиль')}
           <span className="nav-user">
             {user?.username}
-            {user?.roles?.length ? ` (${user.roles.join(', ')})` : ''}
+            {user?.roles?.length ? ` (${roleLabels(user.roles).join(', ')})` : ''}
           </span>
           <button type="button" className="secondary" onClick={logout}>
             Выйти

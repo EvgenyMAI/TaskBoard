@@ -2,11 +2,13 @@
 @tasksHost = http://localhost:8082
 @analyticsHost = http://localhost:8083
 @token = paste_your_jwt_here
+@adminToken = paste_admin_jwt_here
 @projectId = 1
 @taskId = 1
 @commentId = 1
 @attachmentId = 1
 @notificationId = 1
+@userId = 1
 
 ### Register
 POST {{authHost}}/api/auth/register
@@ -51,14 +53,23 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "oldPassword": "password123",
+  "currentPassword": "password123",
   "newPassword": "password1234",
-  "confirmationPhrase": "CONFIRM_PASSWORD_CHANGE"
+  "confirmationPhrase": "I_CONFIRM_PASSWORD_CHANGE"
 }
 
 ### Users list
 GET {{authHost}}/api/users
 Authorization: Bearer {{token}}
+
+### Update user role (admin only)
+PUT {{authHost}}/api/auth/users/{{userId}}/roles
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "roles": ["MANAGER"]
+}
 
 ### Get projects
 GET {{tasksHost}}/api/projects
@@ -92,6 +103,23 @@ Content-Type: application/json
 DELETE {{tasksHost}}/api/projects/{{projectId}}
 Authorization: Bearer {{token}}
 
+### Get project members
+GET {{tasksHost}}/api/projects/{{projectId}}/members
+Authorization: Bearer {{token}}
+
+### Add project member
+POST {{tasksHost}}/api/projects/{{projectId}}/members
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "userId": {{userId}}
+}
+
+### Remove project member
+DELETE {{tasksHost}}/api/projects/{{projectId}}/members/{{userId}}
+Authorization: Bearer {{adminToken}}
+
 ### Get tasks with filters
 GET {{tasksHost}}/api/tasks?projectId={{projectId}}&status=OPEN&page=0&size=20
 Authorization: Bearer {{token}}
@@ -106,7 +134,7 @@ Content-Type: application/json
   "title": "HTTP Task",
   "description": "Task created via api.http",
   "status": "OPEN",
-  "assigneeId": 1,
+  "assigneeId": {{userId}},
   "dueDate": null
 }
 
@@ -124,7 +152,7 @@ Content-Type: application/json
   "title": "HTTP Task Updated",
   "description": "Task updated via api.http",
   "status": "IN_PROGRESS",
-  "assigneeId": 1,
+  "assigneeId": {{userId}},
   "dueDate": null
 }
 

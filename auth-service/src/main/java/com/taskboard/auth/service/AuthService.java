@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -48,22 +49,26 @@ public class AuthService {
             throw new IllegalArgumentException("Email already registered: " + request.getEmail());
         }
 
-        Role executorRole = roleRepository.findByName(Role.RoleName.EXECUTOR)
-                .orElseGet(() -> roleRepository.save(Role.builder().name(Role.RoleName.EXECUTOR).build()));
+        Role.RoleName roleToAssign = userRepository.existsByRoles_Name(Role.RoleName.ADMIN)
+                ? Role.RoleName.EXECUTOR
+                : Role.RoleName.ADMIN;
+
+        Role roleEntity = roleRepository.findByName(roleToAssign)
+                .orElseGet(() -> roleRepository.save(Role.builder().name(roleToAssign).build()));
 
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .email(request.getEmail())
-                .roles(new HashSet<>(Set.of(executorRole)))
+                .roles(new HashSet<>(Set.of(roleEntity)))
                 .enabled(true)
                 .build();
         user = userRepository.save(user);
 
-        String token = tokenProvider.generateToken(user.getUsername(), user.getId());
         Set<String> roles = user.getRoles().stream()
                 .map(r -> r.getName().name())
                 .collect(Collectors.toSet());
+        String token = tokenProvider.generateToken(user.getUsername(), user.getId(), List.copyOf(roles));
         return AuthResponse.of(token, user.getId(), user.getUsername(), roles);
     }
 
@@ -128,6 +133,21 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Transactional
+    public UserProfileDto updateUserRoles(Long targetUserId, Set<Role.RoleName> roleNames) {
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + targetUserId));
+
+        Set<Role> newRoles = roleNames.stream()
+                .map(roleName -> roleRepository.findByName(roleName)
+                        .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build())))
+                .collect(Collectors.toSet());
+
+        user.getRoles().clear();
+        user.getRoles().addAll(newRoles);
+        return toProfile(userRepository.save(user));
     }
 
     private UserProfileDto toProfile(User user) {
