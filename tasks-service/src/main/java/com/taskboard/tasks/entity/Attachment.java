@@ -22,13 +22,32 @@ public class Attachment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Path or URL to the file (file storage is out of scope for MVP). */
+    /** URL download endpoint for this attachment. */
     @NotBlank
     @Column(nullable = false, length = 1024)
     private String filePathOrUrl;
 
     @Column(length = 255)
     private String fileName;
+
+    @Column(name = "mime_type", length = 255)
+    private String mimeType;
+
+    @Column(name = "file_size")
+    private Long fileSize;
+
+    /**
+     * Kept for backward-compatible schema; URL attachments are disabled in API.
+     */
+    @Column(name = "external_link", nullable = false)
+    @Builder.Default
+    private Boolean externalLink = false;
+
+    /**
+     * Kept for backward-compatible schema with previous file-storage model.
+     */
+    @Column(name = "storage_path", length = 1024)
+    private String storagePath;
 
     @Column(name = "uploaded_by")
     private Long uploadedBy;

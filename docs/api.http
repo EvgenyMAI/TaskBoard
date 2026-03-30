@@ -181,15 +181,25 @@ Authorization: Bearer {{token}}
 GET {{tasksHost}}/api/tasks/{{taskId}}/attachments
 Authorization: Bearer {{token}}
 
-### Add attachment
-POST {{tasksHost}}/api/tasks/{{taskId}}/attachments
+### Upload attachment file (multipart)
+POST {{tasksHost}}/api/tasks/{{taskId}}/attachments/upload
 Authorization: Bearer {{token}}
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=WebAppBoundary
 
-{
-  "filePathOrUrl": "https://example.com/spec.pdf",
-  "fileName": "spec.pdf"
-}
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample.txt"
+Content-Type: text/plain
+
+sample content
+--WebAppBoundary--
+
+### Download attachment file
+GET {{tasksHost}}/api/tasks/{{taskId}}/attachments/{{attachmentId}}/download
+Authorization: Bearer {{token}}
+
+### Preview attachment (images/text/pdf)
+GET {{tasksHost}}/api/tasks/{{taskId}}/attachments/{{attachmentId}}/preview
+Authorization: Bearer {{token}}
 
 ### Delete attachment
 DELETE {{tasksHost}}/api/tasks/{{taskId}}/attachments/{{attachmentId}}

@@ -28,7 +28,7 @@
 |---|---|
 | Backend | Java 17, Spring Boot 3, Spring Data JPA, Spring Security |
 | Frontend | React 18, Vite, React Router |
-| База данных | PostgreSQL 16 (по БД на сервис) |
+| База данных | PostgreSQL 16 (по БД на сервис), MinIO (объектное хранилище вложений) |
 | Аутентификация | JWT (HS256), BCrypt |
 | Инфраструктура | Docker, Docker Compose |
 | Сборка | Maven, npm |
@@ -49,6 +49,7 @@
 Дополнительно:
 
 - отдельный PostgreSQL-контейнер для каждого backend-сервиса;
+- отдельный MinIO-контейнер для хранения файлов вложений;
 - `tasks-service` отправляет внутренние уведомления в `analytics-service`;
 - пользовательские API защищены JWT.
 
@@ -132,7 +133,9 @@
 Вложения:
 
 - `GET /api/tasks/{taskId}/attachments`
-- `POST /api/tasks/{taskId}/attachments`
+- `POST /api/tasks/{taskId}/attachments/upload`
+- `GET /api/tasks/{taskId}/attachments/{id}/download`
+- `GET /api/tasks/{taskId}/attachments/{id}/preview`
 - `DELETE /api/tasks/{taskId}/attachments/{id}`
 
 История:
@@ -168,6 +171,7 @@
 - пользователь не может читать чужие уведомления (фильтрация по `userId` из токена);
 - в публичном создании уведомлений `userId` берется из аутентификации, не из тела запроса;
 - внутренние уведомления между сервисами защищены `NOTIFICATIONS_INTERNAL_KEY`.
+- содержимое вложений хранится в MinIO, доступ к чтению/скачиванию идет только через защищенные endpoint `tasks-service`.
 
 ---
 
@@ -311,6 +315,11 @@ npm run dev
 - `AUTH_SERVICE_PORT`
 - `TASKS_SERVICE_PORT`
 - `ANALYTICS_SERVICE_PORT`
+- `MINIO_PORT`
+- `MINIO_CONSOLE_PORT`
+- `MINIO_ACCESS_KEY`
+- `MINIO_SECRET_KEY`
+- `MINIO_BUCKET`
 - `POSTGRES_AUTH_*`
 - `POSTGRES_TASKS_*`
 - `POSTGRES_ANALYTICS_*`
@@ -338,7 +347,6 @@ Frontend (`frontend/.env`):
 
 ## 11. Что можно улучшать дальше
 
-- реальная загрузка/хранение файлов вложений;
 - расширение отчетности на основе фактических данных tasks-service;
 - WebSocket/SSE для realtime-уведомлений вместо polling;
 - покрытие критичных сценариев unit/integration/e2e тестами;

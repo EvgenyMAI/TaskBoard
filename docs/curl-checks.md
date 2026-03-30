@@ -82,7 +82,19 @@ curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" "http://localhost:8082/api/task
 curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8083/api/notifications/unread
 ```
 
-## 9) Cleanup
+## 9) Upload real file attachment
+
+```bash
+echo "file from curl" > sample.txt
+ATTACHMENT_ID=$(curl -sS -X POST http://localhost:8082/api/tasks/$TASK_ID/attachments/upload \
+  -H "Authorization: Bearer $EXEC_TOKEN" \
+  -F "file=@sample.txt" | jq -r '.id')
+
+curl -sS -H "Authorization: Bearer $EXEC_TOKEN" \
+  http://localhost:8082/api/tasks/$TASK_ID/attachments/$ATTACHMENT_ID/download -o downloaded.txt
+```
+
+## 10) Cleanup
 
 ```bash
 curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082/api/tasks/$TASK_ID
