@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
 import Skeleton from '../components/Skeleton';
+import { useAuth } from '../context/AuthContext';
 import {
   getTasks,
   getProjects,
   getUsers,
   createTask,
+  getProjectMembers,
 } from '../api';
 
 const STATUS_LABELS = {
@@ -18,11 +20,21 @@ const STATUS_LABELS = {
   CANCELLED: 'Отменена',
 };
 
+function formatDueDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('ru-RU');
+}
+
 export default function TasksPage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const isExecutor = user?.roles?.includes('EXECUTOR');
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
+  const [membersForProject, setMembersForProject] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [filterProjectId, setFilterProjectId] = useState('');
@@ -63,6 +75,34 @@ export default function TasksPage() {
     getUsers().then(setUsers).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (isExecutor) return;
+    if (!formProjectId) {
+      setMembersForProject([]);
+      setFormAssigneeId('');
+      return;
+    }
+    const pid = Number(formProjectId);
+    getProjectMembers(pid)
+      .then((ids) => {
+        const next = Array.isArray(ids) ? ids : [];
+        setMembersForProject(next);
+        // Если текущий выбранный исполнитель не является участником проекта — сбрасываем
+        if (formAssigneeId && !next.includes(Number(formAssigneeId))) {
+          setFormAssigneeId('');
+        }
+      })
+      .catch(() => {
+        setMembersForProject([]);
+      });
+  }, [formProjectId, isExecutor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isExecutor) return;
+    setFilterAssigneeId('');
+    setFormAssigneeId(String(user?.userId ?? ''));
+  }, [isExecutor, user?.userId]);
+
   const projectById = (id) => projects.find((p) => p.id === id)?.name || `#${id}`;
   const userById = (id) => users.find((u) => u.id === id)?.username || `#${id}`;
 
@@ -70,6 +110,10 @@ export default function TasksPage() {
     e.preventDefault();
     if (!formProjectId) {
       setError('Выберите проект');
+      return;
+    }
+    if (isExecutor && !user?.userId) {
+      setError('Не удалось определить текущего пользователя');
       return;
     }
     setTouched({ projectId: true, title: true });
@@ -82,7 +126,7 @@ export default function TasksPage() {
         title: formTitle,
         description: formDescription || undefined,
         status: formStatus,
-        assigneeId: formAssigneeId ? Number(formAssigneeId) : undefined,
+        assigneeId: isExecutor ? user.userId : (formAssigneeId ? Number(formAssigneeId) : undefined),
         dueDate: formDueDate ? new Date(formDueDate).toISOString() : undefined,
       });
       setFormTitle('');
@@ -142,18 +186,20 @@ export default function TasksPage() {
                 ))}
               </select>
             </div>
-            <div className="form-group">
-              <label>Исполнитель</label>
-              <select
-                value={filterAssigneeId}
-                onChange={(e) => setFilterAssigneeId(e.target.value)}
-              >
-                <option value="">Все</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.username}</option>
-                ))}
-              </select>
-            </div>
+            {!isExecutor && (
+              <div className="form-group">
+                <label>Исполнитель</label>
+                <select
+                  value={filterAssigneeId}
+                  onChange={(e) => setFilterAssigneeId(e.target.value)}
+                >
+                  <option value="">Все</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -208,12 +254,23 @@ export default function TasksPage() {
                 </div>
                 <div className="form-group">
                   <label>Исполнитель</label>
-                  <select value={formAssigneeId} onChange={(e) => setFormAssigneeId(e.target.value)}>
-                    <option value="">— не назначен —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.username}</option>
-                    ))}
-                  </select>
+                  {isExecutor ? (
+                    <select value={formAssigneeId} disabled>
+                      <option value={user?.userId}>
+                        {user?.username || `#${user?.userId}`}
+                      </option>
+                    </select>
+                  ) : (
+                    <select value={formAssigneeId} onChange={(e) => setFormAssigneeId(e.target.value)}>
+                      <option value="">— не назначен —</option>
+                      {membersForProject
+                        .map((uid) => users.find((u) => u.id === uid))
+                        .filter(Boolean)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>{u.username}</option>
+                        ))}
+                    </select>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Срок</label>
@@ -250,17 +307,20 @@ export default function TasksPage() {
           <ul className="task-list">
             {tasks.map((t) => (
               <li key={t.id} className="card task-list-item">
-                <div className="task-list-item-main">
-                  <Link to={`/tasks/${t.id}`} className="task-title">
-                    {t.title}
-                  </Link>
-                  <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
-                    {STATUS_LABELS[t.status] || t.status}
-                  </span>
-                  <span className="muted small">
-                    {t.projectId ? projectById(t.projectId) : ''}
-                    {t.assigneeId ? ` · ${userById(t.assigneeId)}` : ''}
-                  </span>
+                <div className="task-item-content">
+                  <div className="task-item-header">
+                    <Link to={`/tasks/${t.id}`} className="task-title">
+                      {t.title}
+                    </Link>
+                    <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
+                      {STATUS_LABELS[t.status] || t.status}
+                    </span>
+                  </div>
+                  <div className="task-item-meta">
+                    <span className="meta-chip">Проект: {t.projectId ? projectById(t.projectId) : '—'}</span>
+                    <span className="meta-chip">Исполнитель: {t.assigneeId ? userById(t.assigneeId) : '—'}</span>
+                    <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
+                  </div>
                 </div>
                 <Link to={`/tasks/${t.id}`} className="btn-link">
                   Открыть →

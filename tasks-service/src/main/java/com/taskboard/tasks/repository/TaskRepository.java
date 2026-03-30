@@ -33,4 +33,14 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
                                        Pageable pageable);
 
     List<Task> findByDueDateBeforeAndStatusNot(Instant dueDate, Task.TaskStatus status);
+
+    @Query("SELECT DISTINCT t.project.id FROM Task t WHERE t.assigneeId = :assigneeId")
+    List<Long> findDistinctProjectIdsByAssigneeId(@Param("assigneeId") Long assigneeId);
+
+    @Query("SELECT t FROM Task t " +
+           "WHERE t.project.id IN :projectIds " +
+           "AND (:status IS NULL OR t.status = :status)")
+    Page<Task> findByProjectIdsAndStatus(@Param("projectIds") List<Long> projectIds,
+                                           @Param("status") Task.TaskStatus status,
+                                           Pageable pageable);
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import {
   getTask,
   updateTask,
@@ -39,6 +40,7 @@ export default function TaskDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { user } = useAuth();
   const [task, setTask] = useState(null);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
@@ -116,6 +118,10 @@ export default function TaskDetailPage() {
 
   const projectName = (pid) => projects.find((p) => p.id === pid)?.name || `#${pid}`;
   const userName = (uid) => users.find((u) => u.id === uid)?.username || `#${uid}`;
+  const currentUserId = user?.userId;
+  const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
+  const canEditTask = Boolean(task && (isAdminOrManager || task.assigneeId === currentUserId));
+  const canDeleteTask = Boolean(task && (isAdminOrManager || task.assigneeId === currentUserId || task.createdBy === currentUserId));
 
   const handleSaveTask = async (e) => {
     e.preventDefault();
@@ -265,12 +271,16 @@ export default function TaskDetailPage() {
           <div className="page-header-actions">
             {!editing ? (
               <>
-                <button type="button" onClick={() => setEditing(true)}>
-                  Редактировать
-                </button>
-                <button type="button" className="danger" onClick={handleDeleteTask}>
-                  Удалить
-                </button>
+                {canEditTask && (
+                  <button type="button" onClick={() => setEditing(true)}>
+                    Редактировать
+                  </button>
+                )}
+                {canDeleteTask && (
+                  <button type="button" className="danger" onClick={handleDeleteTask}>
+                    Удалить
+                  </button>
+                )}
               </>
             ) : (
               <button type="button" className="secondary" onClick={() => setEditing(false)}>
@@ -281,7 +291,7 @@ export default function TaskDetailPage() {
         </div>
         {error && <p className="error">{error}</p>}
 
-        {editing ? (
+        {editing && canEditTask ? (
           <div className="card form-card">
             <h2>Редактировать задачу</h2>
             <form onSubmit={handleSaveTask}>
@@ -384,9 +394,11 @@ export default function TaskDetailPage() {
                   <li key={c.id} className="comment-item">
                     <p className="comment-text">{c.text}</p>
                     <span className="muted small">{userName(c.authorId)} · {formatDate(c.createdAt)}</span>
-                    <button type="button" className="secondary small danger" onClick={() => handleDeleteComment(c.id)}>
-                      Удалить
-                    </button>
+                    {(isAdminOrManager || c.authorId === currentUserId) && (
+                      <button type="button" className="secondary small danger" onClick={() => handleDeleteComment(c.id)}>
+                        Удалить
+                      </button>
+                    )}
                   </li>
                 ))
               )}
@@ -424,9 +436,11 @@ export default function TaskDetailPage() {
                     <a href={a.filePathOrUrl} target="_blank" rel="noopener noreferrer">
                       {a.fileName || a.filePathOrUrl}
                     </a>
-                    <button type="button" className="secondary small danger" onClick={() => handleDeleteAttachment(a.id)}>
-                      Удалить
-                    </button>
+                    {(isAdminOrManager || a.uploadedBy === currentUserId) && (
+                      <button type="button" className="secondary small danger" onClick={() => handleDeleteAttachment(a.id)}>
+                        Удалить
+                      </button>
+                    )}
                   </li>
                 ))
               )}

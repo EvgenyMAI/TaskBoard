@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import {
   getProject,
   getTasks,
   createTask,
   deleteProject,
   getUsers,
+  getProjectMembers,
+  addProjectMember,
+  removeProjectMember,
 } from '../api';
 
 const STATUS_LABELS = {
@@ -18,13 +22,24 @@ const STATUS_LABELS = {
   CANCELLED: 'Отменена',
 };
 
+function formatDueDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('ru-RU');
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { user } = useAuth();
+  const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
+  const isExecutor = Boolean(user?.roles?.includes('EXECUTOR'));
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [projectMembers, setProjectMembers] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -34,6 +49,9 @@ export default function ProjectDetailPage() {
   const [taskStatus, setTaskStatus] = useState('OPEN');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberToAdd, setMemberToAdd] = useState('');
+  const [inviting, setInviting] = useState(false);
 
   const loadProject = () => {
     getProject(id)
@@ -50,11 +68,12 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    Promise.all([getProject(id), getTasks({ projectId: id }), getUsers()])
-      .then(([proj, taskList, userList]) => {
+    Promise.all([getProject(id), getTasks({ projectId: id }), getUsers(), getProjectMembers(id)])
+      .then(([proj, taskList, userList, memberIds]) => {
         setProject(proj);
         setTasks(Array.isArray(taskList) ? taskList : []);
         setUsers(userList || []);
+        setProjectMembers(Array.isArray(memberIds) ? memberIds : []);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -63,6 +82,7 @@ export default function ProjectDetailPage() {
   const refreshTasks = () => {
     loadTasks();
   };
+  const userName = (uid) => users.find((u) => u.id === uid)?.username || `#${uid}`;
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
@@ -74,7 +94,7 @@ export default function ProjectDetailPage() {
         title: taskTitle,
         description: taskDescription || undefined,
         status: taskStatus,
-        assigneeId: taskAssigneeId ? Number(taskAssigneeId) : undefined,
+        assigneeId: isExecutor ? user?.userId : (taskAssigneeId ? Number(taskAssigneeId) : undefined),
         dueDate: taskDueDate ? new Date(taskDueDate).toISOString() : undefined,
       });
       setTaskTitle('');
@@ -90,6 +110,49 @@ export default function ProjectDetailPage() {
       toast.error(e.message);
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const refreshMembers = async () => {
+    setMembersLoading(true);
+    try {
+      const ids = await getProjectMembers(id);
+      setProjectMembers(Array.isArray(ids) ? ids : []);
+    } catch (_) {
+      // ignore UI refresh errors
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    if (!memberToAdd) return;
+    setInviting(true);
+    setError('');
+    try {
+      await addProjectMember(id, Number(memberToAdd));
+      toast.success('Участник добавлен');
+      setMemberToAdd('');
+      await refreshMembers();
+    } catch (e2) {
+      toast.error(e2.message);
+      setError(e2.message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    if (!window.confirm('Удалить участника из проекта?')) return;
+    setError('');
+    try {
+      await removeProjectMember(id, memberId);
+      toast.success('Участник удалён');
+      await refreshMembers();
+    } catch (e) {
+      toast.error(e.message);
+      setError(e.message);
     }
   };
 
@@ -148,12 +211,69 @@ export default function ProjectDetailPage() {
             <button type="button" onClick={() => setShowTaskForm(!showTaskForm)}>
               {showTaskForm ? 'Отмена' : '+ Новая задача'}
             </button>
-            <button type="button" className="danger" onClick={handleDeleteProject}>
-              Удалить проект
-            </button>
+            {isAdminOrManager && (
+              <button type="button" className="danger" onClick={handleDeleteProject}>
+                Удалить проект
+              </button>
+            )}
           </div>
         </div>
         {error && <p className="error">{error}</p>}
+
+        {isAdminOrManager && (
+          <div className="card">
+            <h2>Участники проекта</h2>
+            {membersLoading ? (
+              <p className="muted small">Загрузка...</p>
+            ) : (
+              <>
+                <ul className="card-list">
+                  {(projectMembers || []).map((uid) => {
+                    const u = users.find((x) => x.id === uid);
+                    const isOwner = project?.createdBy === uid;
+                    return (
+                      <li key={uid} className="card card-list-item">
+                        <div className="card-list-item-main">
+                          <strong>{u?.username || `#${uid}`}</strong>
+                          {isOwner && <span className="muted small"> (владелец)</span>}
+                        </div>
+                        {!isOwner && (
+                          <button
+                            type="button"
+                            className="danger small"
+                            onClick={() => handleRemoveMember(uid)}
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {(projectMembers || []).length === 0 && (
+                    <li className="muted">Пока нет участников.</li>
+                  )}
+                </ul>
+
+                <form onSubmit={handleAddMember} className="form-group" style={{ marginTop: '1rem' }}>
+                  <label>Добавить участника</label>
+                  <select value={memberToAdd} onChange={(e) => setMemberToAdd(e.target.value)}>
+                    <option value="">— выбрать —</option>
+                    {users
+                      .filter((u) => !(projectMembers || []).includes(u.id))
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>{u.username}</option>
+                      ))}
+                  </select>
+                  <div className="form-actions">
+                    <button type="submit" disabled={inviting || !memberToAdd}>
+                      {inviting ? 'Добавление...' : 'Добавить'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        )}
 
         {showTaskForm && (
           <div className="card form-card">
@@ -192,15 +312,24 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="form-group">
                   <label>Исполнитель</label>
-                  <select
-                    value={taskAssigneeId}
-                    onChange={(e) => setTaskAssigneeId(e.target.value)}
-                  >
-                    <option value="">— не назначен —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.username}</option>
-                    ))}
-                  </select>
+                  {isExecutor ? (
+                    <select value={user?.userId || ''} disabled>
+                      <option value={user?.userId}>{user?.username || `#${user?.userId}`}</option>
+                    </select>
+                  ) : (
+                    <select
+                      value={taskAssigneeId}
+                      onChange={(e) => setTaskAssigneeId(e.target.value)}
+                    >
+                      <option value="">— не назначен —</option>
+                      {(projectMembers || [])
+                        .map((uid) => users.find((u) => u.id === uid))
+                        .filter(Boolean)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>{u.username}</option>
+                        ))}
+                    </select>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Срок</label>
@@ -232,16 +361,19 @@ export default function ProjectDetailPage() {
           <ul className="task-list">
             {tasks.map((t) => (
               <li key={t.id} className="card task-list-item">
-                <div className="task-list-item-main">
-                  <Link to={`/tasks/${t.id}`} className="task-title">
-                    {t.title}
-                  </Link>
-                  <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
-                    {STATUS_LABELS[t.status] || t.status}
-                  </span>
-                  {t.assigneeId && (
-                    <span className="muted small">Исполнитель ID: {t.assigneeId}</span>
-                  )}
+                <div className="task-item-content">
+                  <div className="task-item-header">
+                    <Link to={`/tasks/${t.id}`} className="task-title">
+                      {t.title}
+                    </Link>
+                    <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
+                      {STATUS_LABELS[t.status] || t.status}
+                    </span>
+                  </div>
+                  <div className="task-item-meta">
+                    <span className="meta-chip">Исполнитель: {t.assigneeId ? userName(t.assigneeId) : '—'}</span>
+                    <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
+                  </div>
                 </div>
                 <Link to={`/tasks/${t.id}`} className="btn-link">
                   Открыть →

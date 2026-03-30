@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import Skeleton from '../components/Skeleton';
+import { useAuth } from '../context/AuthContext';
 import {
   getProjects,
   createProject,
@@ -14,6 +15,8 @@ import {
 
 export default function ProjectsPage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,7 @@ export default function ProjectsPage() {
   useEffect(() => load(), []);
 
   const openCreate = () => {
+    if (!isAdminOrManager) return;
     setModal('create');
     setName('');
     setDescription('');
@@ -103,9 +107,11 @@ export default function ProjectsPage() {
         </div>
         <div className="page-header">
           <h2>Список проектов</h2>
-          <button type="button" onClick={openCreate}>
-            + Создать проект
-          </button>
+          {isAdminOrManager && (
+            <button type="button" onClick={openCreate}>
+              + Создать проект
+            </button>
+          )}
         </div>
         {error && <p className="error">{error}</p>}
         {loading ? (
@@ -116,7 +122,7 @@ export default function ProjectsPage() {
           </ul>
         ) : projects.length === 0 ? (
           <div className="card">
-            <p className="muted">Нет проектов. Создайте первый проект.</p>
+            <p className="muted">{isAdminOrManager ? 'Нет проектов. Создайте первый проект.' : 'Нет проектов, где вы участник. Администратор назначит вас через задачи.'}</p>
           </div>
         ) : (
           <ul className="card-list">
@@ -132,12 +138,16 @@ export default function ProjectsPage() {
                   <Link to={`/projects/${p.id}`} className="btn-link">
                     Открыть
                   </Link>
-                  <button type="button" className="secondary small" onClick={() => openEdit(p)}>
-                    Изменить
-                  </button>
-                  <button type="button" className="danger small" onClick={() => handleDelete(p)}>
-                    Удалить
-                  </button>
+                  {isAdminOrManager && (
+                    <>
+                      <button type="button" className="secondary small" onClick={() => openEdit(p)}>
+                        Изменить
+                      </button>
+                      <button type="button" className="danger small" onClick={() => handleDelete(p)}>
+                        Удалить
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             ))}
