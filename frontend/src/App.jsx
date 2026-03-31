@@ -11,6 +11,7 @@ import TasksPage from './pages/TasksPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -25,6 +26,7 @@ function AppRoutes() {
       <Route path="/tasks" element={<PrivateRoute><TasksPage /></PrivateRoute>} />
       <Route path="/tasks/:id" element={<PrivateRoute><TaskDetailPage /></PrivateRoute>} />
       <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
+      <Route path="/analytics" element={<PrivateRoute><AnalyticsPage /></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

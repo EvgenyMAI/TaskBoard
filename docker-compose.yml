@@ -119,6 +119,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_ANALYTICS_PASSWORD:-postgres}
       JWT_SECRET: ${JWT_SECRET:-taskboard-auth-secret-key-min-256-bits-for-hs256}
       NOTIFICATIONS_INTERNAL_KEY: ${NOTIFICATIONS_INTERNAL_KEY:-taskboard-internal-key}
+      TASKS_BASE_URL: http://tasks-service:8082
+      AUTH_BASE_URL: http://auth-service:8081
       LOG_FILE: /app/logs/analytics-service.log
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:

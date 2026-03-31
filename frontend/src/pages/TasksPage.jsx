@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
 import Skeleton from '../components/Skeleton';
@@ -28,6 +28,7 @@ function formatDueDate(iso) {
 }
 
 export default function TasksPage() {
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const { user } = useAuth();
   const isExecutor = user?.roles?.includes('EXECUTOR');
@@ -37,9 +38,9 @@ export default function TasksPage() {
   const [membersForProject, setMembersForProject] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [filterProjectId, setFilterProjectId] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterAssigneeId, setFilterAssigneeId] = useState('');
+  const [filterProjectId, setFilterProjectId] = useState(searchParams.get('projectId') || '');
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || '');
+  const [filterAssigneeId, setFilterAssigneeId] = useState(searchParams.get('assigneeId') || '');
   const [showCreate, setShowCreate] = useState(false);
   const [formProjectId, setFormProjectId] = useState('');
   const [formTitle, setFormTitle] = useState('');
@@ -99,7 +100,6 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!isExecutor) return;
-    setFilterAssigneeId('');
     setFormAssigneeId(String(user?.userId ?? ''));
   }, [isExecutor, user?.userId]);
 
@@ -186,20 +186,18 @@ export default function TasksPage() {
                 ))}
               </select>
             </div>
-            {!isExecutor && (
-              <div className="form-group">
-                <label>Исполнитель</label>
-                <select
-                  value={filterAssigneeId}
-                  onChange={(e) => setFilterAssigneeId(e.target.value)}
-                >
-                  <option value="">Все</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.username}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="form-group">
+              <label>Исполнитель</label>
+              <select
+                value={filterAssigneeId}
+                onChange={(e) => setFilterAssigneeId(e.target.value)}
+              >
+                <option value="">Все</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 

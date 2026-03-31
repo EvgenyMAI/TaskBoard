@@ -26,6 +26,11 @@ app:
     secret: ${JWT_SECRET:taskboard-auth-secret-key-min-256-bits-for-hs256}
   notifications:
     internal-key: ${NOTIFICATIONS_INTERNAL_KEY:taskboard-internal-key}
+  integrations:
+    tasks:
+      base-url: ${TASKS_BASE_URL:http://tasks-service:8082}
+    auth:
+      base-url: ${AUTH_BASE_URL:http://auth-service:8081}
 
 logging:
   file:

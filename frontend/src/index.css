@@ -424,6 +424,70 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   min-width: 170px;
 }
 
+.analytics-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.7rem;
+}
+.analytics-kpi {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.analytics-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.analytics-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.analytics-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #d4d4d8;
+}
+.analytics-bar-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.analytics-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8b5cf6, #6366f1);
+}
+.analytics-bar-fill.alt {
+  background: linear-gradient(90deg, #06b6d4, #3b82f6);
+}
+.analytics-delta-pos { color: #34d399; }
+.analytics-delta-neg { color: #f87171; }
+.analytics-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.analytics-donut {
+  width: 160px;
+  height: 160px;
+  transform: rotate(-90deg);
+}
+.analytics-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 @media (max-width: 860px) {
   .nav { flex-wrap: wrap; gap: 0.6rem; }
   .nav-toggle { display: inline-flex; }

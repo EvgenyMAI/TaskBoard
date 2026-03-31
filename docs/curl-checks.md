@@ -82,7 +82,26 @@ curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" "http://localhost:8082/api/task
 curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8083/api/notifications/unread
 ```
 
-## 9) Upload real file attachment
+## 9) Analytics checks (summary/by-project/by-assignee/export)
+
+```bash
+FROM=$(date -u -d "30 days ago" +"%Y-%m-%dT00:00:00Z")
+TO=$(date -u +"%Y-%m-%dT23:59:59Z")
+
+curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:8083/api/reports/summary?from=$FROM&to=$TO"
+
+curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:8083/api/reports/by-project?from=$FROM&to=$TO"
+
+curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:8083/api/reports/by-assignee?from=$FROM&to=$TO"
+
+curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:8083/api/reports/export?from=$FROM&to=$TO" -o analytics-report.csv
+```
+
+## 10) Upload real file attachment
 
 ```bash
 echo "file from curl" > sample.txt
@@ -94,7 +113,7 @@ curl -sS -H "Authorization: Bearer $EXEC_TOKEN" \
   http://localhost:8082/api/tasks/$TASK_ID/attachments/$ATTACHMENT_ID/download -o downloaded.txt
 ```
 
-## 10) Cleanup
+## 11) Cleanup
 
 ```bash
 curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082/api/tasks/$TASK_ID

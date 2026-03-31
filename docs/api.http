@@ -124,6 +124,10 @@ Authorization: Bearer {{adminToken}}
 GET {{tasksHost}}/api/tasks?projectId={{projectId}}&status=OPEN&page=0&size=20
 Authorization: Bearer {{token}}
 
+### Get tasks filtered by assignee
+GET {{tasksHost}}/api/tasks?assigneeId={{userId}}&page=0&size=20
+Authorization: Bearer {{token}}
+
 ### Create task
 POST {{tasksHost}}/api/tasks
 Authorization: Bearer {{token}}
@@ -223,4 +227,20 @@ Authorization: Bearer {{token}}
 
 ### Report summary
 GET {{analyticsHost}}/api/reports/summary
+Authorization: Bearer {{token}}
+
+### Report summary by period
+GET {{analyticsHost}}/api/reports/summary?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z
+Authorization: Bearer {{token}}
+
+### Report by project
+GET {{analyticsHost}}/api/reports/by-project?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z
+Authorization: Bearer {{token}}
+
+### Report by assignee
+GET {{analyticsHost}}/api/reports/by-assignee?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z
+Authorization: Bearer {{token}}
+
+### Export analytics report (CSV for Excel)
+GET {{analyticsHost}}/api/reports/export?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z
 Authorization: Bearer {{token}}
