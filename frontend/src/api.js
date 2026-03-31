@@ -291,10 +291,32 @@ export async function getTaskHistory(taskId, limit = 50) {
 }
 
 // ——— Reports (stub) ———
-export async function getReportSummary() {
-  const res = await fetch(`${ANALYTICS_API}/reports/summary`, { headers: authHeaders() });
+export async function getReportSummary(params = {}) {
+  const q = new URLSearchParams(params).toString();
+  const res = await fetch(`${ANALYTICS_API}/reports/summary${q ? `?${q}` : ''}`, { headers: authHeaders() });
   if (!res.ok) throw new Error('Не удалось загрузить отчёт');
   return res.json();
+}
+
+export async function getReportByProject(params = {}) {
+  const q = new URLSearchParams(params).toString();
+  const res = await fetch(`${ANALYTICS_API}/reports/by-project${q ? `?${q}` : ''}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Не удалось загрузить аналитику по проектам');
+  return res.json();
+}
+
+export async function getReportByAssignee(params = {}) {
+  const q = new URLSearchParams(params).toString();
+  const res = await fetch(`${ANALYTICS_API}/reports/by-assignee${q ? `?${q}` : ''}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Не удалось загрузить аналитику по исполнителям');
+  return res.json();
+}
+
+export async function downloadReportCsv(params = {}) {
+  const q = new URLSearchParams(params).toString();
+  const res = await fetch(`${ANALYTICS_API}/reports/export${q ? `?${q}` : ''}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Не удалось выгрузить CSV');
+  return res.blob();
 }
 
 // ——— Notifications ———

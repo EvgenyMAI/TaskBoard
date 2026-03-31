@@ -80,6 +80,7 @@
 - `Project detail` (детали проекта и задачи проекта);
 - `Tasks` (список задач + фильтры + создание);
 - `Task detail` (редактирование, комментарии, вложения, история);
+- `Analytics` (KPI, динамика периода, статусы, топ проектов/исполнителей, экспорт CSV);
 - `Notifications` (лента уведомлений, фильтры, read/unread);
 - `Profile` (изменение username/email и смена пароля);
 - `Login` / `Register`.
@@ -153,10 +154,10 @@
 
 Отчеты:
 
-- `GET /api/reports/summary`
-- `GET /api/reports/by-project`
-- `GET /api/reports/by-assignee`
-- `GET /api/reports/export`
+- `GET /api/reports/summary` (поддержка `from`/`to`)
+- `GET /api/reports/by-project` (поддержка `from`/`to`)
+- `GET /api/reports/by-assignee` (поддержка `from`/`to`)
+- `GET /api/reports/export` (CSV для Excel: UTF-8 BOM, русские подписи, читаемый формат даты/времени)
 
 ---
 
@@ -347,7 +348,6 @@ Frontend (`frontend/.env`):
 
 ## 11. Что можно улучшать дальше
 
-- расширение отчетности на основе фактических данных tasks-service;
 - WebSocket/SSE для realtime-уведомлений вместо polling;
 - покрытие критичных сценариев unit/integration/e2e тестами;
 - CI/CD pipeline и автоматические проверки при pull request.

@@ -63,7 +63,7 @@ public class TaskController {
             }
 
             // Если фильтр по проекту не выбран — показываем задачи во всех проектах, где есть назначенные ему задачи.
-            Page<Task> result = taskRepository.findByProjectIdsAndStatus(allowedProjectIds, status, pageable);
+            Page<Task> result = taskRepository.findByProjectIdsAndFilters(allowedProjectIds, status, assigneeId, pageable);
             return ResponseEntity.ok(result);
         }
 

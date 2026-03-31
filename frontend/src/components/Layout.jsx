@@ -57,6 +57,7 @@ export default function Layout({ children }) {
         <div className={`nav-links ${menuOpen ? 'open' : ''}`}>
           {navLink('/projects', 'Проекты')}
           {navLink('/tasks', 'Задачи')}
+          {navLink('/analytics', 'Аналитика')}
           <Link to="/notifications" className={location.pathname.startsWith('/notifications') ? 'active' : ''}>
             Уведомления
             {unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}

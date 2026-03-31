@@ -43,4 +43,13 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     Page<Task> findByProjectIdsAndStatus(@Param("projectIds") List<Long> projectIds,
                                            @Param("status") Task.TaskStatus status,
                                            Pageable pageable);
+
+    @Query("SELECT t FROM Task t " +
+           "WHERE t.project.id IN :projectIds " +
+           "AND (:status IS NULL OR t.status = :status) " +
+           "AND (:assigneeId IS NULL OR t.assigneeId = :assigneeId)")
+    Page<Task> findByProjectIdsAndFilters(@Param("projectIds") List<Long> projectIds,
+                                          @Param("status") Task.TaskStatus status,
+                                          @Param("assigneeId") Long assigneeId,
+                                          Pageable pageable);
 }

@@ -52,6 +52,8 @@ export default function ProjectDetailPage() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberToAdd, setMemberToAdd] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterAssigneeId, setFilterAssigneeId] = useState('');
 
   const loadProject = () => {
     getProject(id)
@@ -60,7 +62,10 @@ export default function ProjectDetailPage() {
   };
 
   const loadTasks = () => {
-    getTasks({ projectId: id })
+    const params = { projectId: id };
+    if (filterStatus) params.status = filterStatus;
+    if (filterAssigneeId) params.assigneeId = filterAssigneeId;
+    getTasks(params)
       .then(setTasks)
       .catch((e) => setError(e.message));
   };
@@ -68,7 +73,10 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    Promise.all([getProject(id), getTasks({ projectId: id }), getUsers(), getProjectMembers(id)])
+    const initialParams = { projectId: id };
+    if (filterStatus) initialParams.status = filterStatus;
+    if (filterAssigneeId) initialParams.assigneeId = filterAssigneeId;
+    Promise.all([getProject(id), getTasks(initialParams), getUsers(), getProjectMembers(id)])
       .then(([proj, taskList, userList, memberIds]) => {
         setProject(proj);
         setTasks(Array.isArray(taskList) ? taskList : []);
@@ -77,7 +85,7 @@ export default function ProjectDetailPage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, filterStatus, filterAssigneeId]);
 
   const refreshTasks = () => {
     loadTasks();
@@ -353,6 +361,31 @@ export default function ProjectDetailPage() {
         )}
 
         <h2 className="section-title">Задачи ({tasks.length})</h2>
+        <div className="filters card">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Статус</label>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="">Любой</option>
+                {Object.entries(STATUS_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Исполнитель</label>
+              <select value={filterAssigneeId} onChange={(e) => setFilterAssigneeId(e.target.value)}>
+                <option value="">Все</option>
+                {(projectMembers || [])
+                  .map((uid) => users.find((u) => u.id === uid))
+                  .filter(Boolean)
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>{u.username}</option>
+                  ))}
+              </select>
+            </div>
+          </div>
+        </div>
         {tasks.length === 0 ? (
           <div className="card">
             <p className="muted">Нет задач. Создайте первую задачу.</p>
