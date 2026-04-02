@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Modal from '../components/Modal';
+import Skeleton from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -18,6 +19,7 @@ import {
   getTaskHistory,
   getProjects,
   getUsers,
+  getProjectMembers,
 } from '../api';
 
 const STATUS_LABELS = {
@@ -26,6 +28,14 @@ const STATUS_LABELS = {
   REVIEW: 'На проверке',
   DONE: 'Выполнена',
   CANCELLED: 'Отменена',
+};
+
+const HISTORY_FIELD_LABELS = {
+  title: 'Название',
+  description: 'Описание',
+  status: 'Статус',
+  assigneeId: 'Исполнитель',
+  dueDate: 'Срок',
 };
 
 function formatDate(s) {
@@ -65,19 +75,7 @@ export default function TaskDetailPage() {
   const [attachmentThumbs, setAttachmentThumbs] = useState({});
   const [viewer, setViewer] = useState({ open: false, url: '', name: '', mime: '', mode: 'file', text: '' });
   const [activeTab, setActiveTab] = useState('comments'); // comments | attachments | history
-
-  const loadTask = () => {
-    getTask(id)
-      .then((t) => {
-        setTask(t);
-        setEditTitle(t.title);
-        setEditDescription(t.description || '');
-        setEditStatus(t.status || 'OPEN');
-        setEditAssigneeId(t.assigneeId ? String(t.assigneeId) : '');
-        setEditDueDate(t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 16) : '');
-      })
-      .catch((e) => setError(e.message));
-  };
+  const [projectMemberIds, setProjectMemberIds] = useState([]);
 
   const loadComments = () => {
     getComments(id).then(setComments).catch(() => {});
@@ -119,8 +117,40 @@ export default function TaskDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+    if (!task?.projectId) {
+      setProjectMemberIds([]);
+      return;
+    }
+    getProjectMembers(task.projectId)
+      .then((ids) => setProjectMemberIds(Array.isArray(ids) ? ids : []))
+      .catch(() => setProjectMemberIds([]));
+  }, [task?.projectId]);
+
+  const assigneeSelectUserIds = useMemo(() => {
+    const ids = [...projectMemberIds];
+    const cur = task?.assigneeId;
+    if (cur != null && !ids.includes(cur)) {
+      ids.unshift(cur);
+    }
+    return ids;
+  }, [projectMemberIds, task?.assigneeId]);
+
   const projectName = (pid) => projects.find((p) => p.id === pid)?.name || `#${pid}`;
   const userName = (uid) => users.find((u) => u.id === uid)?.username || `#${uid}`;
+
+  const formatHistoryValue = (fieldName, raw) => {
+    if (raw == null || raw === '') return '—';
+    if (fieldName === 'status') return STATUS_LABELS[raw] || raw;
+    if (fieldName === 'assigneeId') {
+      const id = Number(raw);
+      return Number.isFinite(id) ? userName(id) : String(raw);
+    }
+    if (fieldName === 'dueDate') return formatDate(raw);
+    return String(raw);
+  };
+
+  const historyFieldTitle = (fieldName) => HISTORY_FIELD_LABELS[fieldName] || fieldName;
   const currentUserId = user?.userId;
   const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
   const canEditTask = Boolean(task && (isAdminOrManager || task.assigneeId === currentUserId));
@@ -375,8 +405,10 @@ export default function TaskDetailPage() {
   if (loading && !task) {
     return (
       <Layout>
-        <div className="container page-width">
-          <p className="muted">Загрузка...</p>
+        <div className="container page-width task-detail-page">
+          <div className="card profile-hero-skeleton"><Skeleton style={{ height: 96 }} /></div>
+          <div className="card profile-section"><Skeleton style={{ height: 140 }} /></div>
+          <div className="card profile-section"><Skeleton style={{ height: 220 }} /></div>
         </div>
       </Layout>
     );
@@ -385,18 +417,22 @@ export default function TaskDetailPage() {
   if (!task) {
     return (
       <Layout>
-        <div className="container page-width">
-          <p className="error">Задача не найдена.</p>
-          <Link to="/tasks">← К списку задач</Link>
+        <div className="container page-width task-detail-page">
+          <section className="card profile-section">
+            <p className="error">Задача не найдена.</p>
+            <Link to="/tasks">← К списку задач</Link>
+          </section>
         </div>
       </Layout>
     );
   }
 
+  const heroLetter = (task.title || 'T').trim().charAt(0).toUpperCase() || 'T';
+
   return (
     <Layout>
-      <div className="container page-width">
-        <div className="breadcrumb">
+      <div className="container page-width task-detail-page">
+        <nav className="breadcrumb task-breadcrumb" aria-label="Навигация">
           <Link to="/tasks">Задачи</Link>
           {task.projectId && (
             <>
@@ -405,46 +441,73 @@ export default function TaskDetailPage() {
             </>
           )}
           <span className="sep">/</span>
-          <span>{task.title}</span>
-        </div>
+          <span className="breadcrumb-current">{task.title}</span>
+        </nav>
 
-        <div className="card page-intro">
-          <h1>{task.title}</h1>
-          <p className="muted">Карточка задачи: редактирование, история, комментарии и вложения.</p>
-        </div>
-
-        <div className="page-header">
-          <h2>Действия по задаче</h2>
-          <div className="page-header-actions">
-            {!editing ? (
-              <>
-                {canEditTask && (
-                  <button type="button" onClick={() => setEditing(true)}>
-                    Редактировать
-                  </button>
-                )}
-                {canDeleteTask && (
-                  <button type="button" className="danger" onClick={handleDeleteTask}>
-                    Удалить
-                  </button>
-                )}
-              </>
-            ) : (
-              <button type="button" className="secondary" onClick={() => setEditing(false)}>
-                Отмена
-              </button>
-            )}
+        <header className="card profile-hero task-detail-hero">
+          <div className="profile-hero-main">
+            <div className="profile-avatar profile-avatar-task-detail" aria-hidden="true">{heroLetter}</div>
+            <div className="profile-hero-text">
+              <h1 className="task-detail-title">{task.title}</h1>
+              <div className="profile-hero-line">
+                <p className="profile-hero-sub">
+                  {task.projectId ? (
+                    <>
+                      Проект:{' '}
+                      <Link to={`/projects/${task.projectId}`}>{projectName(task.projectId)}</Link>
+                    </>
+                  ) : (
+                    'Карточка задачи'
+                  )}
+                </p>
+                <div className="profile-role-chips">
+                  <span className={`badge badge-${(task.status || '').toLowerCase()} task-detail-status-chip`}>
+                    {STATUS_LABELS[task.status] || task.status}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        {error && <p className="error">{error}</p>}
+          <div className="profile-hero-hint profile-hero-hint-row">
+            <p className="muted small profile-hero-hint-text">
+              Создана: {formatDate(task.createdAt)} · Обновлена: {formatDate(task.updatedAt)}
+            </p>
+            <div className="task-detail-hero-actions">
+              {!editing ? (
+                <>
+                  {canEditTask && (
+                    <button type="button" onClick={() => setEditing(true)}>
+                      Редактировать
+                    </button>
+                  )}
+                  {canDeleteTask && (
+                    <button type="button" className="danger" onClick={handleDeleteTask}>
+                      Удалить
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button type="button" className="secondary" onClick={() => setEditing(false)}>
+                  Отмена
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {error && <p className="error task-detail-global-error">{error}</p>}
 
         {editing && canEditTask ? (
-          <div className="card form-card">
-            <h2>Редактировать задачу</h2>
+          <section className="card profile-section" aria-labelledby="task-edit-heading">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="task-edit-heading">Редактирование</h2>
+            </div>
             <form onSubmit={handleSaveTask}>
               <div className="form-group">
-                <label>Название</label>
+                <label htmlFor="task-edit-title">Название</label>
                 <input
+                  id="task-edit-title"
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
@@ -452,8 +515,9 @@ export default function TaskDetailPage() {
                 />
               </div>
               <div className="form-group">
-                <label>Описание</label>
+                <label htmlFor="task-edit-desc">Описание</label>
                 <textarea
+                  id="task-edit-desc"
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   rows={4}
@@ -469,13 +533,41 @@ export default function TaskDetailPage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Исполнитель</label>
-                  <select value={editAssigneeId} onChange={(e) => setEditAssigneeId(e.target.value)}>
-                    <option value="">— не назначен —</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>{u.username}</option>
-                    ))}
-                  </select>
+                  <label htmlFor="task-edit-assignee">Исполнитель</label>
+                  {isAdminOrManager ? (
+                    <select
+                      id="task-edit-assignee"
+                      value={editAssigneeId}
+                      onChange={(e) => setEditAssigneeId(e.target.value)}
+                    >
+                      <option value="">— не назначен —</option>
+                      {assigneeSelectUserIds.map((uid) => {
+                        const u = users.find((x) => x.id === uid);
+                        if (!u) return null;
+                        const notInProject = !projectMemberIds.includes(uid);
+                        const label = notInProject ? `${u.username} (нет в проекте)` : u.username;
+                        return (
+                          <option key={uid} value={String(uid)}>{label}</option>
+                        );
+                      })}
+                    </select>
+                  ) : (
+                    <select id="task-edit-assignee" value={editAssigneeId} disabled aria-readonly="true">
+                      {editAssigneeId ? (
+                        <option value={String(editAssigneeId)}>
+                          {users.find((x) => String(x.id) === String(editAssigneeId))?.username
+                            || `Пользователь #${editAssigneeId}`}
+                        </option>
+                      ) : (
+                        <option value="">— не назначен —</option>
+                      )}
+                    </select>
+                  )}
+                  {isAdminOrManager && (
+                    <p className="muted small" style={{ marginTop: '0.35rem' }}>
+                      Только участники проекта; иначе сначала добавьте пользователя в проект.
+                    </p>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Срок</label>
@@ -495,149 +587,258 @@ export default function TaskDetailPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </section>
         ) : (
-          <div className="card task-meta">
-            <p><strong>Статус:</strong> <span className={`badge badge-${(task.status || '').toLowerCase()}`}>{STATUS_LABELS[task.status] || task.status}</span></p>
-            {task.description && <p><strong>Описание:</strong><br />{task.description}</p>}
-            {task.assigneeId && <p><strong>Исполнитель:</strong> {userName(task.assigneeId)}</p>}
-            {task.dueDate && <p><strong>Срок:</strong> {formatDate(task.dueDate)}</p>}
-            <p className="muted small">Создана: {formatDate(task.createdAt)} · Обновлена: {formatDate(task.updatedAt)}</p>
-          </div>
+          <section className="card profile-section" aria-labelledby="task-summary-heading">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="task-summary-heading">Сводка</h2>
+            </div>
+            <div className="task-detail-summary">
+              <p><strong>Статус:</strong>{' '}
+                <span className={`badge badge-${(task.status || '').toLowerCase()}`}>
+                  {STATUS_LABELS[task.status] || task.status}
+                </span>
+              </p>
+              {task.description && (
+                <p><strong>Описание:</strong><br />{task.description}</p>
+              )}
+              {task.assigneeId && (
+                <p><strong>Исполнитель:</strong> {userName(task.assigneeId)}</p>
+              )}
+              {task.dueDate && (
+                <p><strong>Срок:</strong> {formatDate(task.dueDate)}</p>
+              )}
+            </div>
+          </section>
         )}
 
-        <div className="tabs">
-          <button type="button" className={activeTab === 'comments' ? 'active' : ''} onClick={() => setActiveTab('comments')}>
+        <div className="analytics-segmented task-detail-tabs" role="tablist" aria-label="Разделы карточки">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'comments'}
+            className={activeTab === 'comments' ? 'is-active' : ''}
+            onClick={() => setActiveTab('comments')}
+          >
             Комментарии ({comments.length})
           </button>
-          <button type="button" className={activeTab === 'attachments' ? 'active' : ''} onClick={() => setActiveTab('attachments')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'attachments'}
+            className={activeTab === 'attachments' ? 'is-active' : ''}
+            onClick={() => setActiveTab('attachments')}
+          >
             Вложения ({attachments.length})
           </button>
-          <button type="button" className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'history'}
+            className={activeTab === 'history' ? 'is-active' : ''}
+            onClick={() => setActiveTab('history')}
+          >
             История
           </button>
         </div>
 
         {activeTab === 'comments' && (
-          <div className="card">
-            <h3>Добавить комментарий</h3>
-            <form onSubmit={handleAddComment} className="form-inline">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Текст комментария..."
-                rows={2}
-                style={{ flex: 1, minWidth: 200 }}
-              />
-              <button type="submit" disabled={commentLoading || !newComment.trim()}>
-                {commentLoading ? 'Отправка...' : 'Отправить'}
-              </button>
-            </form>
-            <ul className="comment-list">
-              {comments.length === 0 ? (
-                <li className="muted">Нет комментариев.</li>
-              ) : (
-                comments.map((c) => (
-                  <li key={c.id} className="comment-item">
-                    <p className="comment-text">{c.text}</p>
-                    <span className="muted small">{userName(c.authorId)} · {formatDate(c.createdAt)}</span>
-                    {(isAdminOrManager || c.authorId === currentUserId) && (
-                      <button type="button" className="secondary small danger" onClick={() => handleDeleteComment(c.id)}>
-                        Удалить
-                      </button>
-                    )}
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
+          <section className="card profile-section task-detail-tab-panel" aria-labelledby="task-comments-heading" role="tabpanel">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="task-comments-heading">Комментарии</h2>
+            </div>
+            <div className="task-panel-inner">
+              <div className="task-comments-composer">
+                <h3 className="task-subsection-title">Новый комментарий</h3>
+                <form onSubmit={handleAddComment} className="task-comment-form">
+                  <label htmlFor="task-new-comment" className="sr-only">Текст комментария</label>
+                  <textarea
+                    id="task-new-comment"
+                    className="task-comment-textarea"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Напишите комментарий к задаче…"
+                    rows={3}
+                  />
+                  <div className="task-comment-form-footer">
+                    <button type="submit" disabled={commentLoading || !newComment.trim()}>
+                      {commentLoading ? 'Отправка…' : 'Отправить'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+              <div className="task-comments-list-wrap">
+                <h3 className="task-subsection-title task-subsection-title-spaced">Лента</h3>
+                {comments.length === 0 ? (
+                  <p className="muted task-panel-empty">Комментариев пока нет.</p>
+                ) : (
+                  <ul className="task-comment-cards">
+                    {comments.map((c) => {
+                      const un = userName(c.authorId);
+                      const initial = (un && un.charAt(0) !== '#') ? un.charAt(0).toUpperCase() : '?';
+                      return (
+                        <li key={c.id} className="task-comment-card">
+                          <div className="task-comment-card-top">
+                            <span className="task-comment-avatar" aria-hidden="true">{initial}</span>
+                            <div className="task-comment-card-meta">
+                              <span className="task-comment-author">{un}</span>
+                              <time className="muted small task-comment-time" dateTime={c.createdAt}>
+                                {formatDate(c.createdAt)}
+                              </time>
+                            </div>
+                            {(isAdminOrManager || c.authorId === currentUserId) && (
+                              <button
+                                type="button"
+                                className="secondary small danger task-comment-delete"
+                                onClick={() => handleDeleteComment(c.id)}
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </div>
+                          <p className="task-comment-body">{c.text}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
         )}
 
         {activeTab === 'attachments' && (
-          <div className="card">
-            <h3>Загрузить файл</h3>
-            {canUploadAttachment ? (
-              <>
-                <p className="muted small">Поддерживаются изображения и документы. Максимальный размер: 25 МБ.</p>
-                <form onSubmit={handleUploadAttachment} className="form-row">
-                  <input
-                    type="file"
-                    onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
-                  />
-                  <button type="submit" disabled={attachLoading || !attachFile}>
-                    {attachLoading ? 'Загрузка...' : 'Загрузить файл'}
-                  </button>
-                </form>
-              </>
-            ) : (
-              <p className="muted small">У вас нет прав на загрузку вложений для этой задачи.</p>
-            )}
-            <ul className="attachment-list">
-              {attachments.length === 0 ? (
-                <li className="muted">Нет вложений.</li>
-              ) : (
-                attachments.map((a) => (
-                  <li key={a.id} className="attachment-item">
-                    <div>
-                      <div>
-                        <FileTypeIcon type={fileType(a.fileName, a.mimeType)} />
-                        <strong>{displayName(a)}</strong>
-                      </div>
-                      <div className="muted small">
-                        Тип: {a.mimeType || 'application/octet-stream'} · Размер: {formatBytes(a.fileSize)}
-                      </div>
-                      <div className="form-actions" style={{ marginTop: 8 }}>
-                        {isPreviewable(a.mimeType) && (
-                          <button type="button" className="secondary small" onClick={() => handleOpenAttachment(a)}>
-                            Открыть
-                          </button>
-                        )}
-                        <button type="button" className="secondary small" onClick={() => handleDownloadAttachment(a)}>
-                          Скачать
-                        </button>
-                      </div>
-                      {isImage(a.mimeType) && (
-                        <div style={{ marginTop: 8 }}>
-                          {attachmentThumbs[a.id] ? (
-                            <img
-                              src={attachmentThumbs[a.id]}
-                              alt={a.fileName || 'preview'}
-                              onClick={() => handleOpenAttachment(a)}
-                              style={{ maxWidth: 280, maxHeight: 180, borderRadius: 8, border: '1px solid var(--border-color)', cursor: 'zoom-in' }}
-                            />
-                          ) : (
-                            <span className="muted small">Превью загружается...</span>
+          <section className="card profile-section task-detail-tab-panel" aria-labelledby="task-attachments-heading" role="tabpanel">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="task-attachments-heading">Вложения</h2>
+            </div>
+            <div className="task-panel-inner">
+              <div className="task-attachment-upload-block">
+                <h3 className="task-subsection-title">Загрузить файл</h3>
+                {canUploadAttachment ? (
+                  <>
+                    <p className="muted small task-attachment-hint">
+                      Изображения, PDF, документы и др. Максимум 25 МБ на файл.
+                    </p>
+                    <form onSubmit={handleUploadAttachment} className="task-attachment-upload-form">
+                      <input
+                        type="file"
+                        className="task-attachment-file-input"
+                        onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
+                        aria-label="Выбор файла"
+                      />
+                      <button type="submit" disabled={attachLoading || !attachFile}>
+                        {attachLoading ? 'Загрузка…' : 'Загрузить'}
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <p className="muted small">Нет прав на загрузку вложений для этой задачи.</p>
+                )}
+              </div>
+              <div className="task-attachments-grid-wrap">
+                <h3 className="task-subsection-title task-subsection-title-spaced">Файлы</h3>
+                {attachments.length === 0 ? (
+                  <p className="muted task-panel-empty">Вложений пока нет.</p>
+                ) : (
+                  <ul className="task-attachment-grid">
+                    {attachments.map((a) => (
+                      <li key={a.id} className="task-attachment-card">
+                        <div className="task-attachment-card-main">
+                          <div className="task-attachment-card-title-row">
+                            <FileTypeIcon type={fileType(a.fileName, a.mimeType)} />
+                            <strong className="task-attachment-name">{displayName(a)}</strong>
+                          </div>
+                          <p className="muted small task-attachment-meta-line">
+                            {a.mimeType || 'application/octet-stream'} · {formatBytes(a.fileSize)}
+                          </p>
+                          <div className="task-attachment-actions">
+                            {isPreviewable(a.mimeType) && (
+                              <button type="button" className="secondary small" onClick={() => handleOpenAttachment(a)}>
+                                Открыть
+                              </button>
+                            )}
+                            <button type="button" className="secondary small" onClick={() => handleDownloadAttachment(a)}>
+                              Скачать
+                            </button>
+                            {(isAdminOrManager || a.uploadedBy === currentUserId) && (
+                              <button type="button" className="secondary small danger" onClick={() => handleDeleteAttachment(a.id)}>
+                                Удалить
+                              </button>
+                            )}
+                          </div>
+                          {isImage(a.mimeType) && (
+                            <div className="task-attachment-thumb-wrap">
+                              {attachmentThumbs[a.id] ? (
+                                <button
+                                  type="button"
+                                  className="task-attachment-thumb-btn"
+                                  onClick={() => handleOpenAttachment(a)}
+                                  aria-label={`Открыть превью: ${displayName(a)}`}
+                                >
+                                  <img
+                                    src={attachmentThumbs[a.id]}
+                                    alt=""
+                                    className="task-attachment-thumb-img"
+                                  />
+                                </button>
+                              ) : (
+                                <span className="muted small">Превью загружается…</span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                    {(isAdminOrManager || a.uploadedBy === currentUserId) && (
-                      <button type="button" className="secondary small danger" onClick={() => handleDeleteAttachment(a.id)}>
-                        Удалить
-                      </button>
-                    )}
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
         )}
 
         {activeTab === 'history' && (
-          <div className="card">
-            <ul className="history-list">
+          <section className="card profile-section task-detail-tab-panel" aria-labelledby="task-history-heading" role="tabpanel">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="task-history-heading">История изменений</h2>
+            </div>
+            <div className="task-panel-inner">
+              <p className="muted small task-history-intro">
+                Хронология правок полей задачи. Новые записи сверху.
+              </p>
               {history.length === 0 ? (
-                <li className="muted">История изменений пуста.</li>
+                <p className="muted task-panel-empty">Изменений пока не было.</p>
               ) : (
-                history.map((h) => (
-                  <li key={h.id} className="history-item">
-                    <strong>{h.fieldName}</strong>: {String(h.oldValue || '—')} → {String(h.newValue || '—')}
-                    <span className="muted small"> · {userName(h.changedBy)} · {formatDate(h.changedAt)}</span>
-                  </li>
-                ))
+                <ul className="task-history-list">
+                  {history.map((h) => (
+                    <li key={h.id} className="task-history-card">
+                      <div className="task-history-card-head">
+                        <span className="task-history-field-chip">{historyFieldTitle(h.fieldName)}</span>
+                        <span className="muted small task-history-when">
+                          {userName(h.changedBy)} · {formatDate(h.changedAt)}
+                        </span>
+                      </div>
+                      <div className="task-history-diff" aria-label="Было и стало">
+                        <div className="task-history-col task-history-col-old">
+                          <span className="task-history-col-label">Было</span>
+                          <span className="task-history-value">{formatHistoryValue(h.fieldName, h.oldValue)}</span>
+                        </div>
+                        <span className="task-history-arrow" aria-hidden="true">→</span>
+                        <div className="task-history-col task-history-col-new">
+                          <span className="task-history-col-label">Стало</span>
+                          <span className="task-history-value">{formatHistoryValue(h.fieldName, h.newValue)}</span>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </ul>
-          </div>
+            </div>
+          </section>
         )}
       </div>
       {viewer.open && (

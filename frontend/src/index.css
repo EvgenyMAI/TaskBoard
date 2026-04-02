@@ -876,6 +876,382 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   color: #f5f3ff;
 }
 
+/* Tasks list & task detail (aligned with profile / analytics) */
+.tasks-page .tasks-global-error {
+  margin-bottom: 0.75rem;
+}
+.tasks-hero {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: linear-gradient(145deg, rgba(40, 32, 24, 0.96), rgba(24, 26, 38, 0.9));
+}
+.profile-avatar-tasks {
+  background: linear-gradient(135deg, #d97706, #7c3aed);
+  box-shadow: 0 8px 24px rgba(217, 119, 6, 0.28);
+}
+.tasks-count-chip {
+  max-width: 100%;
+}
+.tasks-filters-row {
+  align-items: flex-end;
+}
+.tasks-empty {
+  margin: 0;
+}
+.tasks-page .task-list .task-list-item.card {
+  margin-bottom: 0.75rem;
+  border-color: rgba(167, 139, 250, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+.tasks-page .task-list .task-list-item.card:last-child {
+  margin-bottom: 0;
+}
+.task-list-item-skeleton.card {
+  margin-bottom: 0.75rem;
+}
+.task-list-item-skeleton.card:last-child {
+  margin-bottom: 0;
+}
+
+.task-detail-page .task-detail-global-error {
+  margin-bottom: 0.75rem;
+}
+.task-breadcrumb {
+  margin-bottom: 0.85rem;
+}
+.task-breadcrumb .breadcrumb-current {
+  display: inline-block;
+  max-width: min(480px, 58vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: #d4d4d8;
+}
+.task-detail-hero {
+  border-color: rgba(245, 158, 11, 0.26);
+  background: linear-gradient(145deg, rgba(38, 32, 28, 0.96), rgba(24, 26, 38, 0.9));
+}
+.profile-avatar-task-detail {
+  background: linear-gradient(135deg, #ea580c, #7c3aed);
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.25);
+}
+.task-detail-hero .task-detail-title {
+  font-size: 1.28rem;
+  line-height: 1.35;
+  margin: 0 0 0.2rem;
+  word-break: break-word;
+}
+.task-detail-hero .profile-hero-sub a {
+  color: #ddd6fe;
+  font-weight: 600;
+}
+.task-detail-hero .profile-hero-sub a:hover {
+  color: #fff;
+}
+.task-detail-status-chip {
+  font-size: 0.78rem;
+}
+.task-detail-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+.task-detail-tabs.analytics-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+}
+.task-detail-tabs.analytics-segmented button {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+}
+.task-detail-summary p {
+  margin: 0.5rem 0;
+}
+.task-detail-summary p:first-child {
+  margin-top: 0;
+}
+.task-detail-summary p:last-child {
+  margin-bottom: 0;
+}
+.task-subsection-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: #e4e4e7;
+}
+.task-subsection-title-spaced {
+  margin-top: 1.25rem;
+}
+.task-detail-tab-panel .task-panel-inner {
+  margin-top: 0.25rem;
+}
+.task-panel-empty {
+  margin: 0.5rem 0 0;
+}
+
+/* Комментарии */
+.task-comments-composer {
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+.task-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.task-comment-textarea {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  color: #e4e4e7;
+  padding: 0.65rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+.task-comment-form-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+.task-comment-cards {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.task-comment-card {
+  border: 1px solid rgba(167, 139, 250, 0.12);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+.task-comment-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+.task-comment-avatar {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ede9fe;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+}
+.task-comment-card-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.task-comment-author {
+  font-weight: 600;
+  color: #e4e4e7;
+}
+.task-comment-delete {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.task-comment-body {
+  margin: 0;
+  padding-left: calc(2.25rem + 0.65rem);
+  line-height: 1.5;
+  color: #d4d4d8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 520px) {
+  .task-comment-body {
+    padding-left: 0;
+  }
+}
+
+/* Вложения */
+.task-attachment-upload-block {
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+.task-attachment-hint {
+  margin: 0 0 0.75rem;
+  line-height: 1.45;
+}
+.task-attachment-upload-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.task-attachment-file-input {
+  font-size: 0.88rem;
+  color: #c4c4cc;
+}
+.task-attachment-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+  /* Карточки без превью не растягиваются по высоте соседа с картинкой */
+  align-items: start;
+}
+.task-attachment-card {
+  border: 1px solid rgba(167, 139, 250, 0.12);
+  border-radius: 10px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  align-self: start;
+  height: fit-content;
+  min-height: 0;
+}
+.task-attachment-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.task-attachment-name {
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+.task-attachment-meta-line {
+  margin: 0 0 0.65rem;
+  line-height: 1.35;
+}
+.task-attachment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.task-attachment-thumb-wrap {
+  margin-top: 0.75rem;
+}
+.task-attachment-thumb-btn {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  cursor: zoom-in;
+  overflow: hidden;
+  line-height: 0;
+}
+.task-attachment-thumb-img {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* История */
+.task-history-intro {
+  margin: 0 0 1rem;
+  line-height: 1.45;
+}
+.task-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.task-history-card {
+  border: 1px solid rgba(167, 139, 250, 0.12);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+.task-history-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.65rem;
+}
+.task-history-field-chip {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #c4b5fd;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(124, 58, 237, 0.12);
+}
+.task-history-when {
+  text-align: right;
+}
+.task-history-diff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+.task-history-col {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.task-history-col-old {
+  background: rgba(239, 68, 68, 0.06);
+}
+.task-history-col-new {
+  background: rgba(34, 197, 94, 0.08);
+}
+.task-history-col-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a1a1aa;
+  margin-bottom: 0.35rem;
+}
+.task-history-value {
+  display: block;
+  font-size: 0.9rem;
+  color: #e4e4e7;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.task-history-arrow {
+  flex-shrink: 0;
+  align-self: center;
+  color: #a78bfa;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
 @media (max-width: 860px) {
   .nav { flex-wrap: wrap; gap: 0.6rem; }
   .nav-toggle { display: inline-flex; }

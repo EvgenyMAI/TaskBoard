@@ -20,6 +20,19 @@ function authOnlyHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Читает сообщение из JSON-ответа Spring (поле message у ResponseStatusException и др.). */
+async function errorMessageFromResponse(res, fallback) {
+  try {
+    const text = await res.text();
+    if (!text?.trim()) return fallback;
+    const j = JSON.parse(text);
+    if (typeof j.message === 'string' && j.message.trim()) return j.message.trim();
+  } catch {
+    /* не JSON или сеть */
+  }
+  return fallback;
+}
+
 // ——— Auth ———
 export async function login(username, password) {
   const res = await fetch(`${AUTH_API}/login`, {
@@ -189,7 +202,9 @@ export async function createTask(data) {
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Не удалось создать задачу');
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, 'Не удалось создать задачу'));
+  }
   return res.json();
 }
 
@@ -199,7 +214,9 @@ export async function updateTask(id, data) {
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Не удалось обновить задачу');
+  if (!res.ok) {
+    throw new Error(await errorMessageFromResponse(res, 'Не удалось обновить задачу'));
+  }
   return res.json();
 }
 

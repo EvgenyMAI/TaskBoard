@@ -56,6 +56,8 @@ TASK_ID=$(curl -sS -X POST http://localhost:8082/api/tasks \
   -d "{\"projectId\":$PROJECT_ID,\"title\":\"Curl task\",\"description\":\"Task from curl\",\"status\":\"OPEN\",\"assigneeId\":$EXEC_USER_ID}" | jq -r '.id')
 ```
 
+Исполнитель в теле запроса должен быть участником проекта (как в примере выше после шага 4); иначе `tasks-service` вернёт ошибку с поясняющим сообщением в JSON.
+
 ## 6) Check access as executor (project/tasks/comments)
 
 ```bash
