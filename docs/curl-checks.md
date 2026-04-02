@@ -123,4 +123,31 @@ curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082
 curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082/api/projects/$PROJECT_ID
 ```
 
+## 12) Автоматизированные тесты (локально)
+
+Ниже команды для полного локального прогона тестов без ручного кликанья UI.
+
+```powershell
+# Только backend integration tests
+.\run-tests.ps1 -BackendOnly
+
+# Только e2e smoke
+.\run-tests.ps1 -E2EOnly
+
+# Полный прогон
+.\run-tests.ps1
+```
+
+Что важно:
+
+- `run-tests.ps1` поднимает отдельный временный docker-compose стек для e2e;
+- порты подбираются автоматически, чтобы не конфликтовать с уже запущенным приложением;
+- после e2e выполняется автоматическая очистка временного стека (`docker compose down -v`).
+
+Рекомендуемый порядок для разработчика:
+
+1. Перед обычным commit: `-BackendOnly`
+2. После изменений UI / auth / notifications: `-E2EOnly`
+3. Перед merge в важной ветке: полный прогон.
+
 > Примечание: примеры используют `jq` для парсинга JSON.
