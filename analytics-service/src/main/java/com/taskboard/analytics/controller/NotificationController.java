@@ -12,11 +12,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Notifications API — persisted in PostgreSQL.
@@ -28,6 +33,7 @@ import java.util.Locale;
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
+    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emittersByUser = new ConcurrentHashMap<>();
 
     @Value("${app.notifications.internal-key:taskboard-internal-key}")
     private String internalKey;
@@ -61,6 +67,26 @@ public class NotificationController {
         Long userId = (Long) auth.getPrincipal();
         long count = notificationRepository.countByUserIdAndReadFalse(userId);
         return ResponseEntity.ok(count);
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+
+        SseEmitter emitter = new SseEmitter(0L); // no timeout
+        emittersByUser.computeIfAbsent(userId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
+
+        emitter.onCompletion(() -> removeEmitter(userId, emitter));
+        emitter.onTimeout(() -> emitter.complete());
+        emitter.onError((ex) -> removeEmitter(userId, emitter));
+
+        try {
+            emitter.send(SseEmitter.event().name("connected").data("ok"));
+        } catch (IOException ignored) {
+            removeEmitter(userId, emitter);
+        }
+
+        return emitter;
     }
 
     @PatchMapping("/{id}/read")
@@ -110,7 +136,31 @@ public class NotificationController {
                 .createdAt(Instant.now())
                 .build();
         NotificationEntity saved = notificationRepository.save(entity);
-        return ResponseEntity.status(201).body(toDto(saved));
+        NotificationDto out = toDto(saved);
+        broadcastToUser(dto.getUserId(), out);
+        return ResponseEntity.status(201).body(out);
+    }
+
+    private void broadcastToUser(Long userId, NotificationDto dto) {
+        CopyOnWriteArrayList<SseEmitter> emitters = emittersByUser.get(userId);
+        if (emitters == null || emitters.isEmpty()) return;
+
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(SseEmitter.event().name("notification").data(dto));
+            } catch (IOException | IllegalStateException ex) {
+                removeEmitter(userId, emitter);
+            }
+        }
+    }
+
+    private void removeEmitter(Long userId, SseEmitter emitter) {
+        CopyOnWriteArrayList<SseEmitter> emitters = emittersByUser.get(userId);
+        if (emitters == null) return;
+        emitters.remove(emitter);
+        if (emitters.isEmpty()) {
+            emittersByUser.remove(userId, emitters);
+        }
     }
 
     private NotificationDto toDto(NotificationEntity entity) {

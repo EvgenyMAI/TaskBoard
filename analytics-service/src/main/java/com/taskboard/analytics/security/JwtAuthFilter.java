@@ -54,6 +54,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(bearer) && bearer.startsWith("Bearer ")) {
             return bearer.substring(7);
         }
+        // EventSource не умеет задавать заголовки Authorization, поэтому разрешаем токен в query-параметре.
+        String tokenFromParam = request.getParameter("access_token");
+        if (!StringUtils.hasText(tokenFromParam)) {
+            tokenFromParam = request.getParameter("token");
+        }
+        if (StringUtils.hasText(tokenFromParam)) {
+            return tokenFromParam.trim();
+        }
         return null;
     }
 }

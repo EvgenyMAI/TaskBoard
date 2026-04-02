@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout';
-import { getNotifications, markNotificationRead } from '../api';
+import { ANALYTICS_API, getToken, getNotifications, markNotificationRead } from '../api';
 import { useToast } from '../context/ToastContext';
 import Skeleton from '../components/Skeleton';
 
@@ -11,6 +11,47 @@ function formatDate(value) {
   } catch {
     return String(value);
   }
+}
+
+const TYPE_LABELS = {
+  TASK_CREATED: 'Создание',
+  TASK_ASSIGNED: 'Назначение',
+  TASK_REASSIGNED: 'Переназначение',
+  TASK_STATUS_CHANGED: 'Смена статуса',
+};
+
+const STATUS_LABELS = {
+  OPEN: 'Открыта',
+  IN_PROGRESS: 'В работе',
+  REVIEW: 'На проверке',
+  DONE: 'Выполнена',
+  CANCELLED: 'Отменена',
+};
+
+function taskTitleFromBody(body) {
+  if (!body) return '';
+  const m = String(body).match(/"([^"]+)"/);
+  return m ? m[1] : '';
+}
+
+function statusCodeFromBody(body) {
+  if (!body) return '';
+  const m = String(body).match(/статус:\s*([A-Z_]+)/i);
+  return m ? m[1].toUpperCase() : '';
+}
+
+function badgeClassForStatus(statusCode) {
+  return statusCode === 'OPEN'
+    ? 'badge-open'
+    : statusCode === 'IN_PROGRESS'
+      ? 'badge-in_progress'
+      : statusCode === 'REVIEW'
+        ? 'badge-review'
+        : statusCode === 'DONE'
+          ? 'badge-done'
+          : statusCode === 'CANCELLED'
+            ? 'badge-cancelled'
+            : '';
 }
 
 export default function NotificationsPage() {
@@ -54,18 +95,31 @@ export default function NotificationsPage() {
   }, [filterRead, filterType, filterSearch, filterFrom, filterTo]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') load(false);
-    }, 8000);
-    return () => window.clearInterval(interval);
+    const token = getToken();
+    if (!token) return;
+
+    let es;
+    try {
+      es = new EventSource(`${ANALYTICS_API}/notifications/stream?access_token=${encodeURIComponent(token)}`);
+      es.addEventListener('notification', () => load(false));
+    } catch {
+      // If SSE fails (e.g., proxy limitations), fallback to manual updates still works.
+    }
+
+    return () => {
+      if (es) es.close();
+    };
   }, [filterRead, filterType, filterSearch, filterFrom, filterTo]);
 
   const markAsRead = async (id, silent = false) => {
+    const current = notifications.find((n) => n.id === id);
+    const title = current?.title || '';
     setProcessingIds((prev) => [...prev, id]);
     try {
       await markNotificationRead(id);
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-      if (!silent) toast.success('Уведомление отмечено как прочитанное');
+      if (!silent) toast.success(title ? `Прочитано: ${title}` : 'Прочитано');
+      if (!silent) window.dispatchEvent(new Event('notifications:changed'));
     } catch (e) {
       toast.error(e.message);
     } finally {
@@ -83,6 +137,7 @@ export default function NotificationsPage() {
       await markAsRead(item.id, true);
     }
     toast.success(`Отмечено прочитанными: ${unread.length}`);
+    window.dispatchEvent(new Event('notifications:changed'));
   };
 
   return (
@@ -90,19 +145,20 @@ export default function NotificationsPage() {
       <div className="container page-width">
         <div className="card page-intro">
           <h1>Уведомления</h1>
-          <p className="muted">Лента событий по задачам с фильтрацией и автообновлением.</p>
+          <p className="muted">События по задачам в реальном времени.</p>
         </div>
         <div className="page-header">
           <div>
             <h2>Лента уведомлений</h2>
-            <p className="muted">
-              Непрочитанных: {unreadCount}. Здесь отображаются события по задачам (создание, назначение, смена статуса).
-            </p>
+            <div className="notifications-unread-summary">
+              <div className="notifications-unread-row">
+                <span className="unread-count-label muted small">Непрочитанных:</span>
+                <span className="unread-count">{unreadCount}</span>
+              </div>
+              <p className="muted small">События по задачам: создание, назначение, смена статуса.</p>
+            </div>
           </div>
           <div className="page-header-actions">
-            <button type="button" className="secondary" onClick={() => load()}>
-              Обновить
-            </button>
             <button type="button" onClick={markAllAsRead} disabled={unreadCount === 0}>
               Отметить все прочитанными
             </button>
@@ -166,12 +222,40 @@ export default function NotificationsPage() {
             {notifications.map((n) => (
               <li key={n.id} className={`card card-list-item notification-item ${n.read ? 'is-read' : 'is-unread'}`}>
                 <div className="card-list-item-main">
-                  <p className="notification-title">
-                    {n.title || 'Уведомление'}
+                  <div className="notification-title-row">
                     {!n.read && <span className="dot-unread" />}
-                  </p>
-                  <p className="muted small">{n.body || '—'}</p>
-                  <p className="muted small">{formatDate(n.createdAt)}</p>
+                    <p className="notification-title">
+                      <span className="notification-title-text">{n.title || 'Уведомление'}</span>
+                      {n.type && <span className="notification-type-chip">{TYPE_LABELS[n.type] || n.type}</span>}
+                    </p>
+                  </div>
+                  {(() => {
+                    const title = taskTitleFromBody(n.body);
+                    const statusCode = n.type === 'TASK_STATUS_CHANGED' ? statusCodeFromBody(n.body) : '';
+                    const statusLabel = statusCode ? (STATUS_LABELS[statusCode] || statusCode) : '';
+                    const badgeClass = badgeClassForStatus(statusCode);
+                    return (
+                      <>
+                        {title ? (
+                          <div className="notification-detail-line">
+                            <span className="notification-detail-label">Задача:</span>
+                            <span className="notification-detail-value">{title}</span>
+                          </div>
+                        ) : (
+                          <p className="notification-body muted small">{n.body || '—'}</p>
+                        )}
+                        {statusCode ? (
+                          <div className="notification-detail-line">
+                            <span className="notification-detail-label">Статус:</span>
+                            <span className={`badge ${badgeClass}`}>{statusLabel}</span>
+                          </div>
+                        ) : null}
+                      </>
+                    );
+                  })()}
+                  <div className="notification-meta">
+                    <span className="meta-chip">{formatDate(n.createdAt)}</span>
+                  </div>
                 </div>
                 {!n.read ? (
                   <button

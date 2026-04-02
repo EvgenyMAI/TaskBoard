@@ -225,6 +225,11 @@ Authorization: Bearer {{token}}
 PATCH {{analyticsHost}}/api/notifications/{{notificationId}}/read
 Authorization: Bearer {{token}}
 
+### Notifications realtime stream (SSE)
+### Примечание: запрос держит соединение (оставьте вкладку открытой и создайте/измените задачу).
+GET {{analyticsHost}}/api/notifications/stream?access_token={{token}}
+Authorization: Bearer {{token}}
+
 ### Report summary
 GET {{analyticsHost}}/api/reports/summary
 Authorization: Bearer {{token}}

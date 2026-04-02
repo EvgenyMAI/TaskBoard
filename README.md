@@ -149,6 +149,7 @@
 
 - `GET /api/notifications` (фильтры: `read`, `type`, `from`, `to`, `q`, `limit`)
 - `GET /api/notifications/unread`
+- `GET /api/notifications/stream` (SSE) — поток realtime-уведомлений для текущего пользователя
 - `PATCH /api/notifications/{id}/read`
 - `POST /api/notifications/internal` (внутренний endpoint с ключом)
 
@@ -348,6 +349,5 @@ Frontend (`frontend/.env`):
 
 ## 11. Что можно улучшать дальше
 
-- WebSocket/SSE для realtime-уведомлений вместо polling;
 - покрытие критичных сценариев unit/integration/e2e тестами;
 - CI/CD pipeline и автоматические проверки при pull request.
