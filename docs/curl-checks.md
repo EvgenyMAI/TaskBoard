@@ -80,6 +80,9 @@ curl -sS -X PUT http://localhost:8081/api/auth/users/$EXEC_USER_ID/roles \
 ```bash
 curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" "http://localhost:8082/api/tasks/$TASK_ID/history?limit=20"
 curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8083/api/notifications/unread
+
+# SSE-поток realtime-уведомлений (соединение будет держаться, создайте/измените задачу для получения события)
+curl -N -sS -H "Authorization: Bearer $EXEC_TOKEN" http://localhost:8083/api/notifications/stream
 ```
 
 ## 9) Analytics checks (summary/by-project/by-assignee/export)

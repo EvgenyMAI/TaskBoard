@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getUnreadNotificationsCount } from '../api';
+import { ANALYTICS_API, getToken, getUnreadNotificationsCount } from '../api';
 import { roleLabels } from '../utils/roles';
 
 export default function Layout({ children }) {
@@ -11,8 +11,6 @@ export default function Layout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    let timerId;
-
     const refreshUnread = () => {
       getUnreadNotificationsCount()
         .then((count) => setUnreadCount(Number(count || 0)))
@@ -20,12 +18,47 @@ export default function Layout({ children }) {
     };
 
     refreshUnread();
-    timerId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') refreshUnread();
-    }, 8000);
 
-    return () => window.clearInterval(timerId);
-  }, [location.pathname]);
+    const onChanged = () => refreshUnread();
+    window.addEventListener('notifications:changed', onChanged);
+
+    const token = getToken();
+    let es;
+    let timerId;
+    const startPollingFallback = () => {
+      if (timerId) return;
+      timerId = window.setInterval(() => {
+        if (document.visibilityState === 'visible') refreshUnread();
+      }, 8000);
+    };
+    if (token && user?.userId) {
+      try {
+        es = new EventSource(`${ANALYTICS_API}/notifications/stream?access_token=${encodeURIComponent(token)}`);
+        es.addEventListener('notification', (evt) => {
+          try {
+            const dto = JSON.parse(evt.data);
+            if (dto && dto.read === false) setUnreadCount((v) => v + 1);
+          } catch {
+            // ignore parse errors
+          }
+        });
+        es.onerror = () => {
+          try {
+            if (es) es.close();
+          } catch {}
+          startPollingFallback();
+        };
+      } catch {
+        startPollingFallback();
+      }
+    }
+
+    return () => {
+      window.removeEventListener('notifications:changed', onChanged);
+      if (es) es.close();
+      if (timerId) window.clearInterval(timerId);
+    };
+  }, [user?.userId]);
 
   useEffect(() => {
     setMenuOpen(false);
