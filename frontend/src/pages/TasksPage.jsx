@@ -160,8 +160,8 @@ export default function TasksPage() {
                   {username ? `Рабочий список для ${username}` : 'Фильтры по проекту, статусу и исполнителю'}
                 </p>
                 <div className="profile-role-chips" aria-live="polite">
-                  <span className="profile-role-chip tasks-count-chip">
-                    {loading ? 'Загрузка…' : `${tasks.length} в списке`}
+                  <span className="profile-chip-metric">
+                    {loading ? 'Загрузка…' : `Задач: ${tasks.length}`}
                   </span>
                 </div>
               </div>

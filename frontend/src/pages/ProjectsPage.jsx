@@ -16,6 +16,8 @@ import {
 export default function ProjectsPage() {
   const toast = useToast();
   const { user } = useAuth();
+  const username = user?.username || '';
+  const heroLetter = username ? username.charAt(0).toUpperCase() : 'P';
   const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState('');
@@ -100,59 +102,89 @@ export default function ProjectsPage() {
 
   return (
     <Layout>
-      <div className="container page-width">
-        <div className="card page-intro">
-          <h1>Проекты</h1>
-          <p className="muted">Создавайте проекты и структурируйте задачи по направлениям работы.</p>
-        </div>
-        <div className="page-header">
-          <h2>Список проектов</h2>
-          {isAdminOrManager && (
-            <button type="button" onClick={openCreate}>
-              + Создать проект
-            </button>
-          )}
-        </div>
-        {error && <p className="error">{error}</p>}
-        {loading ? (
-          <ul className="card-list">
-            <li className="card"><Skeleton style={{ height: 64 }} /></li>
-            <li className="card"><Skeleton style={{ height: 64 }} /></li>
-            <li className="card"><Skeleton style={{ height: 64 }} /></li>
-          </ul>
-        ) : projects.length === 0 ? (
-          <div className="card">
-            <p className="muted">{isAdminOrManager ? 'Нет проектов. Создайте первый проект.' : 'Нет проектов, где вы участник. Администратор назначит вас через задачи.'}</p>
+      <div className="container page-width projects-page">
+        <header className="card profile-hero projects-hero">
+          <div className="profile-hero-main">
+            <div className="profile-avatar profile-avatar-projects" aria-hidden="true">{heroLetter}</div>
+            <div className="profile-hero-text">
+              <h1>Проекты</h1>
+              <div className="profile-hero-line">
+                <p className="profile-hero-sub">
+                  {username
+                    ? `Рабочее пространство для ${username}`
+                    : 'Структурируйте задачи по направлениям и открывайте карточку проекта'}
+                </p>
+                <div className="profile-role-chips" aria-live="polite">
+                  <span className="profile-chip-metric">
+                    {loading ? 'Загрузка…' : `Проектов: ${projects.length}`}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-        ) : (
-          <ul className="card-list">
-            {projects.map((p) => (
-              <li key={p.id} className="card card-list-item">
-                <div className="card-list-item-main">
-                  <Link to={`/projects/${p.id}`} className="card-title">
-                    {p.name}
-                  </Link>
-                  {p.description && <p className="muted small">{p.description}</p>}
-                </div>
-                <div className="card-actions">
-                  <Link to={`/projects/${p.id}`} className="btn-link">
-                    Открыть
-                  </Link>
-                  {isAdminOrManager && (
-                    <>
-                      <button type="button" className="secondary small" onClick={() => openEdit(p)}>
-                        Изменить
-                      </button>
-                      <button type="button" className="danger small" onClick={() => handleDelete(p)}>
-                        Удалить
-                      </button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+          <div className="profile-hero-hint profile-hero-hint-row">
+            <p className="muted small profile-hero-hint-text">
+              {isAdminOrManager
+                ? 'Создавайте проекты, приглашайте участников в карточке проекта и ведите задачи в одном месте.'
+                : 'Откройте проект, чтобы увидеть задачи, где вы участник команды.'}
+            </p>
+            {isAdminOrManager && (
+              <button type="button" onClick={openCreate}>
+                + Создать проект
+              </button>
+            )}
+          </div>
+        </header>
+
+        {error && <p className="error projects-global-error">{error}</p>}
+
+        <section className="card profile-section" aria-labelledby="projects-list-heading">
+          <div className="profile-section-head">
+            <span className="profile-section-icon" aria-hidden="true">◆</span>
+            <h2 id="projects-list-heading">Список проектов</h2>
+          </div>
+          {loading ? (
+            <ul className="projects-card-list">
+              <li className="card projects-card-item-skeleton"><Skeleton style={{ height: 72 }} /></li>
+              <li className="card projects-card-item-skeleton"><Skeleton style={{ height: 72 }} /></li>
+              <li className="card projects-card-item-skeleton"><Skeleton style={{ height: 72 }} /></li>
+            </ul>
+          ) : projects.length === 0 ? (
+            <p className="muted projects-empty">
+              {isAdminOrManager
+                ? 'Нет проектов. Создайте первый проект.'
+                : 'Нет проектов, где вы участник. Администратор может добавить вас в состав проекта.'}
+            </p>
+          ) : (
+            <ul className="projects-card-list">
+              {projects.map((p) => (
+                <li key={p.id} className="card projects-card-item">
+                  <div className="projects-card-item-main">
+                    <Link to={`/projects/${p.id}`} className="projects-card-title">
+                      {p.name}
+                    </Link>
+                    {p.description && <p className="muted small projects-card-desc">{p.description}</p>}
+                  </div>
+                  <div className="projects-card-actions">
+                    <Link to={`/projects/${p.id}`} className="btn-link">
+                      Открыть →
+                    </Link>
+                    {isAdminOrManager && (
+                      <>
+                        <button type="button" className="secondary small" onClick={() => openEdit(p)}>
+                          Изменить
+                        </button>
+                        <button type="button" className="danger small" onClick={() => handleDelete(p)}>
+                          Удалить
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
       {modal && (

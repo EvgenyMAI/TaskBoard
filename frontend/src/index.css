@@ -483,6 +483,7 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 .profile-page .profile-global-error {
   margin-bottom: 0.75rem;
 }
+/* Шапки основных разделов: одна палитра. Классы *-hero в разметке не задают свой фон. */
 .profile-hero {
   border-color: rgba(167, 139, 250, 0.28);
   background: linear-gradient(145deg, rgba(30, 27, 48, 0.95), rgba(24, 26, 38, 0.88));
@@ -507,6 +508,16 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   font-size: 1.35rem;
   font-weight: 700;
   color: #ede9fe;
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+}
+/* Единый акцент аватаров в шапках разделов (без разных цветов по страницам) */
+.profile-avatar-tasks,
+.profile-avatar-projects,
+.profile-avatar-project-detail,
+.profile-avatar-task-detail,
+.profile-avatar-analytics,
+.profile-avatar-notifications {
   background: linear-gradient(135deg, #7c3aed, #6366f1);
   box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
 }
@@ -561,6 +572,20 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   border: 1px solid rgba(167, 139, 250, 0.35);
   color: #ddd6fe;
 }
+/* Числовые подписи в hero («Задач: N», «Проектов: N») — тот же стиль, что у чипов */
+.profile-chip-metric {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #ddd6fe;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .profile-section-head {
   display: flex;
   align-items: center;
@@ -588,7 +613,7 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   overflow: hidden;
 }
 .profile-admin-card.is-open {
-  border-color: rgba(251, 191, 36, 0.22);
+  border-color: rgba(167, 139, 250, 0.38);
 }
 .profile-admin-toggle {
   display: flex;
@@ -770,14 +795,6 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 .analytics-page .analytics-global-error {
   margin-bottom: 0.75rem;
 }
-.analytics-hero {
-  border-color: rgba(45, 212, 191, 0.24);
-  background: linear-gradient(145deg, rgba(19, 32, 36, 0.96), rgba(24, 26, 38, 0.9));
-}
-.profile-avatar-analytics {
-  background: linear-gradient(135deg, #0d9488, #6366f1);
-  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.32);
-}
 .analytics-period-chip {
   max-width: 100%;
   overflow: hidden;
@@ -880,17 +897,6 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 .tasks-page .tasks-global-error {
   margin-bottom: 0.75rem;
 }
-.tasks-hero {
-  border-color: rgba(245, 158, 11, 0.28);
-  background: linear-gradient(145deg, rgba(40, 32, 24, 0.96), rgba(24, 26, 38, 0.9));
-}
-.profile-avatar-tasks {
-  background: linear-gradient(135deg, #d97706, #7c3aed);
-  box-shadow: 0 8px 24px rgba(217, 119, 6, 0.28);
-}
-.tasks-count-chip {
-  max-width: 100%;
-}
 .tasks-filters-row {
   align-items: flex-end;
 }
@@ -912,6 +918,101 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   margin-bottom: 0;
 }
 
+/* Projects list & project detail */
+.projects-page .projects-global-error {
+  margin-bottom: 0.75rem;
+}
+.projects-empty {
+  margin: 0;
+}
+.projects-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.projects-card-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-color: rgba(167, 139, 250, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  margin: 0;
+}
+.projects-card-item-main {
+  flex: 1;
+  min-width: 0;
+}
+.projects-card-title {
+  font-weight: 600;
+  color: #e4e4e7;
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+.projects-card-title:hover {
+  color: #a78bfa;
+}
+.projects-card-desc {
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+}
+.projects-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.projects-card-item-skeleton.card {
+  margin: 0;
+}
+
+.project-detail-page .project-detail-global-error {
+  margin-bottom: 0.75rem;
+}
+.project-breadcrumb {
+  margin-bottom: 0.85rem;
+}
+.project-breadcrumb .breadcrumb-current {
+  display: inline-block;
+  max-width: min(480px, 58vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: #d4d4d8;
+}
+.project-detail-skeleton-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.project-detail-skeleton-list .task-list-item-skeleton.card {
+  margin-bottom: 0.75rem;
+}
+.project-detail-skeleton-list .task-list-item-skeleton.card:last-child {
+  margin-bottom: 0;
+}
+.project-detail-page .project-detail-task-list .task-list-item.card {
+  margin-bottom: 0.75rem;
+  border-color: rgba(167, 139, 250, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+.project-detail-page .project-detail-task-list .task-list-item.card:last-child {
+  margin-bottom: 0;
+}
+.project-members-invite {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.project-members-list .project-member-row {
+  align-items: flex-start;
+}
+
 .task-detail-page .task-detail-global-error {
   margin-bottom: 0.75rem;
 }
@@ -926,14 +1027,6 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   white-space: nowrap;
   vertical-align: bottom;
   color: #d4d4d8;
-}
-.task-detail-hero {
-  border-color: rgba(245, 158, 11, 0.26);
-  background: linear-gradient(145deg, rgba(38, 32, 28, 0.96), rgba(24, 26, 38, 0.9));
-}
-.profile-avatar-task-detail {
-  background: linear-gradient(135deg, #ea580c, #7c3aed);
-  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.25);
 }
 .task-detail-hero .task-detail-title {
   font-size: 1.28rem;
@@ -1320,10 +1413,6 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 }
 
 /* Notifications page (aligned with profile hero / sections) */
-.profile-avatar-notifications {
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.32);
-}
 .profile-hero-hint-row {
   display: flex;
   flex-wrap: wrap;

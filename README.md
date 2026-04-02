@@ -251,6 +251,8 @@ npm run dev
 
 ## 8. Как пользоваться приложением (через UI)
 
+Основные разделы (проекты, задачи, аналитика, уведомления, профиль и карточки сущностей) используют один стиль верхнего блока: тёмный фон с фиолетовой рамкой, аватар-буква и чипы с понятными подписями («Задач: N», «Проектов: N», «Непрочитанных: N» и т.п.).
+
 <details>
   <summary><strong>Шаг 1. Регистрация и вход</strong></summary>
 
@@ -261,10 +263,9 @@ npm run dev
 <details>
   <summary><strong>Шаг 2. Работа с проектами (Projects)</strong></summary>
 
-  - Страница проектов: [docs/screenshots/03-projects-create.png](docs/screenshots/03-projects-create.png)
-  - Создание проекта: [docs/screenshots/04-projects-create.png](docs/screenshots/04-projects-create.png)
-  - Управление проектом: [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
-  - Добавление/удаление участников проекта: [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
+  - Страница проектов: верхний блок (hero) с краткой сводкой и кнопкой создания, ниже секция со списком карточек проектов. [docs/screenshots/03-projects-create.png](docs/screenshots/03-projects-create.png)
+  - Создание и редактирование проекта (модальное окно): [docs/screenshots/04-projects-create.png](docs/screenshots/04-projects-create.png)
+  - Карточка проекта: тот же тип шапки, чипы «Задач: N» и при необходимости «Участников: N», секции фильтров, списка задач и формы новой задачи; для администратора и менеджера блок «Участники проекта» свёрнут по умолчанию (как управление ролями в профиле), внутри — поиск, пагинация и приглашение. [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
 </details>
 
 <details>
@@ -277,7 +278,7 @@ npm run dev
 <details>
   <summary><strong>Шаг 4. Работа со списком задач (Tasks)</strong></summary>
 
-  - Общая страница задач: [docs/screenshots/08-tasks-create.png](docs/screenshots/08-tasks-create.png)
+  - Общая страница задач (hero, чип «Задач: N», фильтры и список): [docs/screenshots/08-tasks-create.png](docs/screenshots/08-tasks-create.png)
   - Создание задачи: [docs/screenshots/09-tasks-create.png](docs/screenshots/09-tasks-create.png)
   - Фильтрация задач по проекту: [docs/screenshots/10-tasks-create.png](docs/screenshots/10-tasks-create.png)
 </details>

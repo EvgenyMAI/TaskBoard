@@ -198,7 +198,7 @@ export default function NotificationsPage() {
                 <div className="profile-role-chips" aria-live="polite">
                   {unreadCount > 0 ? (
                     <span className="profile-role-chip notifications-unread-pill">
-                      {unreadCount} непрочит.
+                      Непрочитанных: {unreadCount}
                     </span>
                   ) : (
                     <span className="muted small profile-role-chips-empty">Все прочитано</span>
