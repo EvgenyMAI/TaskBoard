@@ -66,7 +66,15 @@ curl -sS -X POST -H "Authorization: Bearer $EXEC_TOKEN" -H "Content-Type: applic
   http://localhost:8082/api/tasks/$TASK_ID/comments
 ```
 
-## 7) Optional: promote user role (admin only)
+## 7) Optional: list users (admin UI / assignee data)
+
+Ответ — массив объектов с полями `id`, `username`, `email`, `roles` (роли совпадают с моделью JWT).
+
+```bash
+curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8081/api/users | jq .
+```
+
+## 8) Optional: promote user role (admin only)
 
 ```bash
 curl -sS -X PUT http://localhost:8081/api/auth/users/$EXEC_USER_ID/roles \
@@ -75,7 +83,7 @@ curl -sS -X PUT http://localhost:8081/api/auth/users/$EXEC_USER_ID/roles \
   -d '{"roles":["MANAGER"]}'
 ```
 
-## 8) Read history + notifications
+## 9) Read history + notifications
 
 ```bash
 curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" "http://localhost:8082/api/tasks/$TASK_ID/history?limit=20"
@@ -85,7 +93,7 @@ curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8083/api/notif
 curl -N -sS -H "Authorization: Bearer $EXEC_TOKEN" http://localhost:8083/api/notifications/stream
 ```
 
-## 9) Analytics checks (summary/by-project/by-assignee/export)
+## 10) Analytics checks (summary/by-project/by-assignee/export)
 
 ```bash
 FROM=$(date -u -d "30 days ago" +"%Y-%m-%dT00:00:00Z")
@@ -104,7 +112,7 @@ curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
   "http://localhost:8083/api/reports/export?from=$FROM&to=$TO" -o analytics-report.csv
 ```
 
-## 10) Upload real file attachment
+## 11) Upload real file attachment
 
 ```bash
 echo "file from curl" > sample.txt
@@ -116,14 +124,14 @@ curl -sS -H "Authorization: Bearer $EXEC_TOKEN" \
   http://localhost:8082/api/tasks/$TASK_ID/attachments/$ATTACHMENT_ID/download -o downloaded.txt
 ```
 
-## 11) Cleanup
+## 12) Cleanup
 
 ```bash
 curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082/api/tasks/$TASK_ID
 curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082/api/projects/$PROJECT_ID
 ```
 
-## 12) Автоматизированные тесты (локально)
+## 13) Автоматизированные тесты (локально)
 
 Ниже команды для полного локального прогона тестов без ручного кликанья UI.
 

@@ -99,6 +99,36 @@ class AuthIntegrationTest {
         JsonNode updatedJson = objectMapper.readTree(updated);
         assertEquals(execUserId, updatedJson.get("id").asLong());
         assertTrue(updatedJson.get("roles").toString().contains("MANAGER"));
+
+        // GET /api/users: сводки с email (профиль админа, назначение исполнителей)
+        String userList = mockMvc.perform(get("/api/users")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode usersArr = objectMapper.readTree(userList);
+        assertTrue(usersArr.isArray());
+        assertTrue(usersArr.size() >= 2);
+        boolean seenAdmin = false;
+        boolean seenExec = false;
+        for (JsonNode u : usersArr) {
+            assertTrue(u.hasNonNull("id"));
+            assertTrue(u.hasNonNull("username"));
+            assertTrue(u.has("email"));
+            assertTrue(u.has("roles"));
+            String un = u.get("username").asText();
+            if ("admin1".equals(un)) {
+                assertEquals("admin1@example.com", u.get("email").asText());
+                assertTrue(u.get("roles").toString().contains("ADMIN"));
+                seenAdmin = true;
+            }
+            if ("exec1".equals(un)) {
+                assertEquals("exec1@example.com", u.get("email").asText());
+                assertTrue(u.get("roles").toString().contains("MANAGER"));
+                seenExec = true;
+            }
+        }
+        assertTrue(seenAdmin, "admin1 должен быть в списке пользователей");
+        assertTrue(seenExec, "exec1 должен быть в списке пользователей");
     }
 }
 

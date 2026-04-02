@@ -67,7 +67,7 @@ Content-Type: application/json
   "confirmationPhrase": "I_CONFIRM_PASSWORD_CHANGE"
 }
 
-### Users list
+### Users list (id, username, email, roles — для назначения исполнителей и админского UI)
 GET {{authHost}}/api/users
 Authorization: Bearer {{token}}
 

@@ -12,5 +12,7 @@ import java.util.Set;
 public class UserSummaryDto {
     private Long id;
     private String username;
+    /** Для админского UI (поиск в профиле); не секрет, но не показывать без необходимости. */
+    private String email;
     private Set<String> roles;
 }
