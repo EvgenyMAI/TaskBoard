@@ -832,3 +832,125 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   white-space: nowrap;
   max-width: 480px;
 }
+
+/* Notifications page (aligned with profile hero / sections) */
+.profile-avatar-notifications {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.32);
+}
+.profile-hero-hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.profile-hero-hint-text {
+  margin: 0;
+  flex: 1;
+  min-width: 160px;
+  line-height: 1.45;
+}
+.notifications-page .notifications-global-error {
+  margin-bottom: 0.75rem;
+}
+.notifications-filters-row {
+  align-items: flex-end;
+}
+.notifications-filter-search {
+  flex: 2;
+  min-width: 200px;
+}
+.notifications-skeleton-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.notifications-skeleton-list .card {
+  margin-bottom: 1rem;
+}
+.notifications-accordion-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.notification-card {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.notification-card.is-open {
+  border-color: rgba(167, 139, 250, 0.22);
+}
+.notification-toggle {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin: 0;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.notification-toggle:hover {
+  filter: none;
+  transform: none;
+  background: rgba(255, 255, 255, 0.05);
+}
+.notification-toggle:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+.notification-toggle-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.85rem;
+}
+.notification-preview-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.notification-preview-title {
+  margin: 0;
+}
+.notification-preview-when {
+  flex-shrink: 0;
+}
+.notification-panel {
+  padding: 0 1.25rem 1.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  animation: cardIn 0.2s ease-out;
+}
+.notification-body-full {
+  margin: 0.65rem 0 0;
+  color: #d4d4d8;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.notification-panel .notification-detail-value {
+  white-space: normal;
+  max-width: 100%;
+}
+.notification-meta-full {
+  margin-top: 0.75rem;
+}
+.notifications-unread-pill {
+  font-weight: 700;
+}

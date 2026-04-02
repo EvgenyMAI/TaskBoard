@@ -81,7 +81,7 @@
 - `Tasks` (список задач + фильтры + создание);
 - `Task detail` (редактирование, комментарии, вложения, история);
 - `Analytics` (KPI, динамика периода, статусы, топ проектов/исполнителей, экспорт CSV);
-- `Notifications` (лента уведомлений, фильтры, read/unread);
+- `Notifications` (лента в стиле профиля; разворачиваемые записи с превью и полным текстом; фильтры: прочитанность, тип, поиск — без периода по датам в UI; непрочитанное помечается прочитанным при раскрытии; «все прочитанными»);
 - `Profile` (данные профиля, смена пароля; для `ADMIN` — сворачиваемый блок «Управление ролями» с ленивой загрузкой списка, поиском по имени/почте и пагинацией);
 - `Login` / `Register`.
 
@@ -147,7 +147,7 @@
 
 Уведомления (с сохранением в PostgreSQL):
 
-- `GET /api/notifications` (фильтры: `read`, `type`, `from`, `to`, `q`, `limit`)
+- `GET /api/notifications` (фильтры API: `read`, `type`, `from`, `to`, `q`, `limit`; в UI используются `read`, `type`, `q`)
 - `GET /api/notifications/unread`
 - `GET /api/notifications/stream` (SSE) — поток realtime-уведомлений для текущего пользователя
 - `PATCH /api/notifications/{id}/read`
@@ -293,8 +293,8 @@ npm run dev
 <details>
   <summary><strong>Шаг 6. Уведомления (Notifications)</strong></summary>
 
-  - Непрочитанные уведомления: [docs/screenshots/15-notifications.png](docs/screenshots/15-notifications.png)
-  - Прочитанные уведомления: [docs/screenshots/16-notifications.png](docs/screenshots/16-notifications.png)
+  - Общий вид ленты и фильтров: [docs/screenshots/15-notifications.png](docs/screenshots/15-notifications.png)
+  - Пример с развёрнутой записью / прочитанными: [docs/screenshots/16-notifications.png](docs/screenshots/16-notifications.png)
 </details>
 
 <details>
