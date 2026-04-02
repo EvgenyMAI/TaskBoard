@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:tasks_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+
+app:
+  jwt:
+    secret: taskboard-auth-secret-key-min-256-bits-for-hs256
+  notifications:
+    base-url: http://localhost:8083
+    internal-key: taskboard-internal-key
+  attachments:
+    minio:
+      endpoint: http://localhost:9000
+      access-key: minioadmin
+      secret-key: minioadmin
+      bucket: taskboard-attachments
+
+logging:
+  level:
+    root: WARN

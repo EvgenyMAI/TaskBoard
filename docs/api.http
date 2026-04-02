@@ -10,6 +10,15 @@
 @notificationId = 1
 @userId = 1
 
+### =============================
+### Test-oriented usage notes
+### =============================
+### 1) Выполните Register/Login и скопируйте JWT в `@token` / `@adminToken`.
+### 2) Создайте проект, затем подставьте `@projectId`.
+### 3) Добавьте участника в проект (`POST /projects/{id}/members`), затем создайте задачу.
+### 4) Проверьте уведомления и SSE-поток.
+### Такой порядок соответствует setup для integration/e2e сценариев.
+
 ### Register
 POST {{authHost}}/api/auth/register
 Content-Type: application/json
@@ -249,3 +258,25 @@ Authorization: Bearer {{token}}
 ### Export analytics report (CSV for Excel)
 GET {{analyticsHost}}/api/reports/export?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z
 Authorization: Bearer {{token}}
+
+### ---------------------------------
+### Realtime notifications test flow
+### ---------------------------------
+
+### Step A: Open SSE stream in a dedicated tab
+GET {{analyticsHost}}/api/notifications/stream?access_token={{token}}
+Authorization: Bearer {{token}}
+
+### Step B: In another tab create/update task to generate notification
+POST {{tasksHost}}/api/tasks
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "projectId": {{projectId}},
+  "title": "SSE smoke task",
+  "description": "created to trigger notification",
+  "status": "OPEN",
+  "assigneeId": {{userId}},
+  "dueDate": null
+}

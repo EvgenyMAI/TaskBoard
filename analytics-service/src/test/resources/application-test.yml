@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:analytics_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+
+app:
+  jwt:
+    secret: taskboard-auth-secret-key-min-256-bits-for-hs256
+  notifications:
+    internal-key: taskboard-internal-key
+  integrations:
+    tasks:
+      base-url: http://localhost:8082
+    auth:
+      base-url: http://localhost:8081
+
+logging:
+  level:
+    root: WARN
