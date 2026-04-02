@@ -141,9 +141,37 @@ test('login, create project+task, receive realtime notification', async ({ page,
       throw new Error(`create task failed: ${createTask.status} ${createTask.text}`);
     }
 
-    await expect(execPage.getByText(`E2E Task ${suffix}`)).toBeVisible({ timeout: 30000 });
+    // Свернутое превью показывает title API («Вам назначена задача»), название задачи — в body и видно после раскрытия.
+    const assignCard = execPage.locator('.notification-card').filter({ hasText: 'Вам назначена задача' }).first();
+    await expect(assignCard).toBeVisible({ timeout: 30000 });
+    await assignCard.locator('.notification-toggle').click();
+    await expect(assignCard.locator('.notification-detail-value')).toHaveText(`E2E Task ${suffix}`);
   } finally {
     await execContext.close();
   }
+});
+
+test('analytics page renders key sections', async ({ page }) => {
+  await waitForAuthReady();
+  const suffix = String(Date.now());
+  const auth = await registerAndLogin({
+    username: `e2e_analytics_${suffix}`,
+    email: `e2e_analytics_${suffix}@example.com`,
+    password: 'password123',
+  });
+
+  await page.goto('/');
+  await page.evaluate(({ token, u }) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(u));
+  }, {
+    token: auth.accessToken,
+    u: { userId: auth.userId, username: auth.username, roles: auth.roles },
+  });
+
+  await page.goto('/analytics');
+  await expect(page.getByRole('heading', { name: 'Аналитика' })).toBeVisible();
+  await expect(page.locator('#analytics-from')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Сводные показатели' })).toBeVisible();
 });
 

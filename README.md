@@ -80,7 +80,7 @@
 - `Project detail` (детали проекта и задачи проекта);
 - `Tasks` (список задач + фильтры + создание);
 - `Task detail` (редактирование, комментарии, вложения, история);
-- `Analytics` (KPI, динамика периода, статусы, топ проектов/исполнителей, экспорт CSV);
+- `Analytics` (оформление как у профиля/уведомлений: hero, секции ◆; период и пресеты, CSV; KPI-карточки; динамика периода; статусы — кольцо или столбцы; топы проектов и исполнителей);
 - `Notifications` (лента в стиле профиля; разворачиваемые записи с превью и полным текстом; фильтры: прочитанность, тип, поиск — без периода по датам в UI; непрочитанное помечается прочитанным при раскрытии; «все прочитанными»);
 - `Profile` (данные профиля, смена пароля; для `ADMIN` — сворачиваемый блок «Управление ролями» с ленивой загрузкой списка, поиском по имени/почте и пагинацией);
 - `Login` / `Register`.
@@ -291,14 +291,20 @@ npm run dev
 </details>
 
 <details>
-  <summary><strong>Шаг 6. Уведомления (Notifications)</strong></summary>
+  <summary><strong>Шаг 6. Аналитика (Analytics)</strong></summary>
+
+  - Сводка и отчёты: [docs/screenshots/19-analytics.png](docs/screenshots/19-analytics.png)
+</details>
+
+<details>
+  <summary><strong>Шаг 7. Уведомления (Notifications)</strong></summary>
 
   - Общий вид ленты и фильтров: [docs/screenshots/15-notifications.png](docs/screenshots/15-notifications.png)
   - Пример с развёрнутой записью / прочитанными: [docs/screenshots/16-notifications.png](docs/screenshots/16-notifications.png)
 </details>
 
 <details>
-  <summary><strong>Шаг 7. Профиль (Profile)</strong></summary>
+  <summary><strong>Шаг 8. Профиль (Profile)</strong></summary>
 
   - Страница профиля: [docs/screenshots/17-profile.png](docs/screenshots/17-profile.png)
   - Профиль после обновления: [docs/screenshots/18-profile.png](docs/screenshots/18-profile.png)
@@ -387,7 +393,8 @@ Frontend (`frontend/.env`):
 - регистрация/логин тестовых пользователей;
 - создание проекта через UI;
 - добавление участника и создание задачи (через API для стабильности smoke);
-- проверка, что назначенному исполнителю приходит уведомление на странице Notifications.
+- проверка, что назначенному исполнителю приходит уведомление на странице Notifications;
+- открытие `/analytics` и проверка заголовка и основных секций (период, сводные показатели).
 
 Почему часть шагов через API — это нормально:
 
