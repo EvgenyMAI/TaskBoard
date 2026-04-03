@@ -144,20 +144,24 @@ curl -sS -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8082
 # Только e2e smoke
 .\run-tests.ps1 -E2EOnly
 
-# Полный прогон
+# Полный прогон (backend → Vitest во frontend → e2e)
 .\run-tests.ps1
 ```
 
 Что важно:
 
+- при полном прогоне после Maven выполняется **`npm run test`** (Vitest) в каталоге `frontend`;
 - `run-tests.ps1` поднимает отдельный временный docker-compose стек для e2e;
 - порты подбираются автоматически, чтобы не конфликтовать с уже запущенным приложением;
 - после e2e выполняется автоматическая очистка временного стека (`docker compose down -v`).
 
+Только unit-тесты фронтенда: `cd frontend` → `npm run test`.
+
 Рекомендуемый порядок для разработчика:
 
 1. Перед обычным commit: `-BackendOnly`
-2. После изменений UI / auth / notifications: `-E2EOnly`
-3. Перед merge в важной ветке: полный прогон.
+2. После правок утилит/хуков на фронте: `cd frontend; npm run test`
+3. После изменений UI / auth / notifications: `-E2EOnly`
+4. Перед merge в важной ветке: полный прогон.
 
 > Примечание: примеры используют `jq` для парсинга JSON.

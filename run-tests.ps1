@@ -327,6 +327,17 @@ if ($BackendOnly) {
 }
 
 if (-not $E2EOnly) {
+  Info "Frontend unit tests (Vitest)"
+  Push-Location (Join-Path $workRoot "frontend")
+  try {
+    Run "npm install"
+    Run "npm run test"
+  } finally {
+    Pop-Location
+  }
+}
+
+if (-not $E2EOnly) {
   Info "E2E (Playwright) preparation"
 }
 

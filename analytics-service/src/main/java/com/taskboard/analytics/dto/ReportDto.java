@@ -8,9 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.Map;
 
 /**
- * Placeholder DTO for report data.
- * In full implementation, analytics-service would call tasks-service (or read from shared DB/events)
- * to compute aggregates.
+ * Ответ API отчётов: тип отчёта, агрегаты (структура зависит от {@code reportType}), время генерации.
  */
 @Data
 @NoArgsConstructor

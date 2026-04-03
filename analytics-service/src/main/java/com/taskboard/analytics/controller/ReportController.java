@@ -6,7 +6,6 @@ import com.taskboard.analytics.service.ReportCsvExporter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -15,8 +14,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 /**
- * Reports API — каркас.
- * В полной реализации: вызов tasks-service или общая БД для агрегатов (количество по проекту, по исполнителю, просроченные, среднее время).
+ * REST API отчётов: агрегаты по задачам за период (вызов tasks-service), выгрузка CSV.
  */
 @RestController
 @RequestMapping("/api/reports")
@@ -28,8 +26,7 @@ public class ReportController {
     private final ReportCsvExporter reportCsvExporter;
 
     @GetMapping("/summary")
-    public ResponseEntity<ReportDto> summary(Authentication auth,
-                                             HttpServletRequest request,
+    public ResponseEntity<ReportDto> summary(HttpServletRequest request,
                                              @RequestParam(value = "from", required = false) String from,
                                              @RequestParam(value = "to", required = false) String to) {
         Instant fromTs = parseInstant(from);
@@ -45,8 +42,7 @@ public class ReportController {
     }
 
     @GetMapping("/by-project")
-    public ResponseEntity<ReportDto> byProject(Authentication auth,
-                                               HttpServletRequest request,
+    public ResponseEntity<ReportDto> byProject(HttpServletRequest request,
                                                @RequestParam(value = "from", required = false) String from,
                                                @RequestParam(value = "to", required = false) String to) {
         Map<String, Object> summary = reportAggregationService.buildSummary(
@@ -67,8 +63,7 @@ public class ReportController {
     }
 
     @GetMapping("/by-assignee")
-    public ResponseEntity<ReportDto> byAssignee(Authentication auth,
-                                                HttpServletRequest request,
+    public ResponseEntity<ReportDto> byAssignee(HttpServletRequest request,
                                                 @RequestParam(value = "from", required = false) String from,
                                                 @RequestParam(value = "to", required = false) String to) {
         Map<String, Object> summary = reportAggregationService.buildSummary(
@@ -89,8 +84,7 @@ public class ReportController {
     }
 
     @GetMapping(value = "/export", produces = "text/csv")
-    public ResponseEntity<String> exportCsv(Authentication auth,
-                                            HttpServletRequest request,
+    public ResponseEntity<String> exportCsv(HttpServletRequest request,
                                             @RequestParam(value = "from", required = false) String from,
                                             @RequestParam(value = "to", required = false) String to) {
         Map<String, Object> summary = reportAggregationService.buildSummary(

@@ -1,5 +1,9 @@
 import { TASKS_API, authHeaders, authOnlyHeaders, errorMessageFromResponse } from './client';
 
+/**
+ * @param {Record<string, string|number|boolean|undefined>} [params]
+ * @returns {Promise<import('../types/api').TaskSummary[]>}
+ */
 export async function getTasks(params = {}) {
   const q = new URLSearchParams(params).toString();
   const res = await fetch(`${TASKS_API}/tasks${q ? `?${q}` : ''}`, { headers: authHeaders() });
@@ -8,6 +12,7 @@ export async function getTasks(params = {}) {
   return data.content !== undefined ? data.content : data;
 }
 
+/** @returns {Promise<import('../types/api').TaskSummary & Record<string, unknown>>} */
 export async function getTask(id) {
   const res = await fetch(`${TASKS_API}/tasks/${id}`, { headers: authHeaders() });
   if (!res.ok) throw new Error('Задача не найдена');

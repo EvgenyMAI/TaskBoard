@@ -1,5 +1,6 @@
 import { USERS_API, authHeaders } from './client';
 
+/** @returns {Promise<import('../types/api').UserSummary[]>} */
 export async function getUsers() {
   const res = await fetch(USERS_API, { headers: authHeaders() });
   if (!res.ok) throw new Error('Не удалось загрузить пользователей');

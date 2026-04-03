@@ -1,11 +1,13 @@
 import { TASKS_API, authHeaders } from './client';
 
+/** @returns {Promise<import('../types/api').ProjectSummary[]>} */
 export async function getProjects() {
   const res = await fetch(`${TASKS_API}/projects`, { headers: authHeaders() });
   if (!res.ok) throw new Error('Не удалось загрузить проекты');
   return res.json();
 }
 
+/** @returns {Promise<import('../types/api').ProjectSummary & Record<string, unknown>>} */
 export async function getProject(id) {
   const res = await fetch(`${TASKS_API}/projects/${id}`, { headers: authHeaders() });
   if (!res.ok) throw new Error('Проект не найден');
