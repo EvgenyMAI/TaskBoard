@@ -24,13 +24,8 @@ jobs:
         working-directory: auth-service
         run: mvn -B test
 
-      - name: Tasks service tests
-        working-directory: tasks-service
-        run: mvn -B test
-
-      - name: Analytics service tests
-        working-directory: analytics-service
-        run: mvn -B test
+      - name: Tasks + analytics (includes taskboard-common)
+        run: mvn -B -pl tasks-service,analytics-service -am test
 
   e2e:
     runs-on: ubuntu-latest
@@ -51,6 +46,10 @@ jobs:
       - name: Install frontend deps
         working-directory: frontend
         run: npm install
+
+      - name: Frontend unit tests (Vitest)
+        working-directory: frontend
+        run: npm run test
 
       - name: Install Playwright browsers
         working-directory: frontend
@@ -74,6 +73,7 @@ jobs:
           E2E_BASE_URL: http://localhost:3000
           E2E_AUTH_API: http://localhost:8081/api/auth
           E2E_TASKS_API: http://localhost:8082/api
+          E2E_ANALYTICS_API: http://localhost:8083/api
         run: npm run test:e2e
 
       - name: Upload frontend log on failure

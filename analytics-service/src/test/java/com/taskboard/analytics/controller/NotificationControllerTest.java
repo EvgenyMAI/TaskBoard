@@ -1,15 +1,15 @@
 package com.taskboard.analytics.controller;
 
 import com.taskboard.analytics.dto.NotificationDto;
-import com.taskboard.analytics.entity.NotificationEntity;
-import com.taskboard.analytics.repository.NotificationRepository;
+import com.taskboard.analytics.service.NotificationApplicationService;
+import com.taskboard.analytics.service.NotificationSseRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.lang.reflect.Field;
@@ -17,15 +17,19 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationControllerTest {
 
     @Mock
-    private NotificationRepository notificationRepository;
+    private NotificationApplicationService notificationApplicationService;
+
+    @Mock
+    private NotificationSseRegistry notificationSseRegistry;
 
     @InjectMocks
     private NotificationController notificationController;
@@ -39,14 +43,6 @@ class NotificationControllerTest {
 
     @Test
     void createUsesAuthenticatedUserIdAndIgnoresPayloadUserId() {
-        when(notificationRepository.save(any(NotificationEntity.class)))
-                .thenAnswer(invocation -> {
-                    NotificationEntity entity = invocation.getArgument(0);
-                    entity.setId(100L);
-                    entity.setCreatedAt(Instant.now());
-                    return entity;
-                });
-
         NotificationDto payload = NotificationDto.builder()
                 .userId(999L)
                 .type("TASK_CREATED")
@@ -54,6 +50,19 @@ class NotificationControllerTest {
                 .body("Body")
                 .read(true)
                 .build();
+
+        NotificationDto saved = NotificationDto.builder()
+                .id(100L)
+                .userId(42L)
+                .type("TASK_CREATED")
+                .title("Title")
+                .body("Body")
+                .read(false)
+                .createdAt(Instant.now())
+                .build();
+
+        when(notificationApplicationService.createForAuthenticatedUser(eq(42L), eq(payload)))
+                .thenReturn(ResponseEntity.status(201).body(saved));
 
         var auth = new UsernamePasswordAuthenticationToken(42L, null);
         var response = notificationController.create(auth, payload);
@@ -63,10 +72,7 @@ class NotificationControllerTest {
         assertEquals(42L, response.getBody().getUserId());
         assertEquals(false, response.getBody().isRead());
 
-        ArgumentCaptor<NotificationEntity> captor = ArgumentCaptor.forClass(NotificationEntity.class);
-        verify(notificationRepository).save(captor.capture());
-        assertEquals(42L, captor.getValue().getUserId());
-        assertEquals(false, captor.getValue().isRead());
+        verify(notificationApplicationService).createForAuthenticatedUser(eq(42L), eq(payload));
     }
 
     @Test
@@ -80,5 +86,6 @@ class NotificationControllerTest {
 
         var response = notificationController.createInternalWithKey("wrong-key", payload);
         assertEquals(401, response.getStatusCode().value());
+        verifyNoInteractions(notificationApplicationService);
     }
 }

@@ -15,23 +15,13 @@ import {
   addProjectMember,
   removeProjectMember,
 } from '../api';
-
-const STATUS_LABELS = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'На проверке',
-  DONE: 'Выполнена',
-  CANCELLED: 'Отменена',
-};
+import { useClientPagination } from '../hooks/useClientPagination';
+import ProjectMembersSection from '../components/project-detail/ProjectMembersSection';
+import ProjectNewTaskSection from '../components/project-detail/ProjectNewTaskSection';
+import ProjectTaskFiltersSection from '../components/project-detail/ProjectTaskFiltersSection';
+import ProjectTasksListSection from '../components/project-detail/ProjectTasksListSection';
 
 const PROJECT_MEMBERS_PAGE_SIZE = 12;
-
-function formatDueDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('ru-RU');
-}
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -61,7 +51,6 @@ export default function ProjectDetailPage() {
   const [filterAssigneeId, setFilterAssigneeId] = useState('');
   const [membersPanelOpen, setMembersPanelOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
-  const [memberPage, setMemberPage] = useState(1);
 
   const heroLetter = (project?.name || 'P').trim().charAt(0).toUpperCase() || 'P';
 
@@ -110,32 +99,13 @@ export default function ProjectDetailPage() {
     });
   }, [projectMembers, users, project?.createdBy]);
 
-  const filteredMemberRows = useMemo(() => {
-    const q = memberSearch.trim().toLowerCase();
-    if (!q) return memberRows;
-    return memberRows.filter(({ user: u, uid }) => {
-      const un = (u?.username || '').toLowerCase();
-      const em = (u?.email || '').toLowerCase();
-      const idStr = String(uid);
-      return un.includes(q) || em.includes(q) || idStr.includes(q);
-    });
-  }, [memberRows, memberSearch]);
-
-  const memberTotalPages = Math.max(1, Math.ceil(filteredMemberRows.length / PROJECT_MEMBERS_PAGE_SIZE));
-
-  useEffect(() => {
-    setMemberPage(1);
-  }, [memberSearch]);
-
-  useEffect(() => {
-    setMemberPage((p) => Math.min(p, memberTotalPages));
-  }, [memberTotalPages]);
-
-  const memberPageSafe = Math.min(memberPage, memberTotalPages);
-  const paginatedMemberRows = useMemo(() => {
-    const start = (memberPageSafe - 1) * PROJECT_MEMBERS_PAGE_SIZE;
-    return filteredMemberRows.slice(start, start + PROJECT_MEMBERS_PAGE_SIZE);
-  }, [filteredMemberRows, memberPageSafe]);
+  const {
+    filteredRows: filteredMemberRows,
+    totalPages: memberTotalPages,
+    page: memberPageSafe,
+    setPage: setMemberPage,
+    pageSlice: paginatedMemberRows,
+  } = useClientPagination(memberRows, { pageSize: PROJECT_MEMBERS_PAGE_SIZE, search: memberSearch });
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
@@ -317,313 +287,61 @@ export default function ProjectDetailPage() {
         {error && <p className="error project-detail-global-error">{error}</p>}
 
         {isAdminOrManager && (
-          <section className={`card profile-section profile-admin-card project-members-card ${membersPanelOpen ? 'is-open' : ''}`}>
-            <button
-              type="button"
-              className="profile-admin-toggle"
-              aria-expanded={membersPanelOpen}
-              aria-controls="project-members-panel"
-              id="project-members-heading"
-              onClick={() => setMembersPanelOpen((v) => !v)}
-            >
-              <span className="profile-section-head profile-admin-toggle-inner">
-                <span className="profile-section-icon" aria-hidden="true">◆</span>
-                <span className="profile-admin-toggle-text">
-                  <span className="profile-admin-toggle-title">Участники проекта</span>
-                  <span className="muted small profile-admin-toggle-desc">
-                    Список, поиск и приглашение — после раскрытия.
-                  </span>
-                </span>
-              </span>
-              <span className={`profile-chevron ${membersPanelOpen ? 'open' : ''}`} aria-hidden="true" />
-            </button>
-
-            {membersPanelOpen && (
-              <div
-                id="project-members-panel"
-                role="region"
-                aria-labelledby="project-members-heading"
-                className="profile-admin-panel"
-              >
-                {membersLoading ? (
-                  <Skeleton style={{ height: 160 }} />
-                ) : (
-                  <>
-                    <div className="profile-admin-toolbar">
-                      <label className="profile-admin-search-label">
-                        <span className="sr-only">Поиск участника</span>
-                        <input
-                          type="search"
-                          className="profile-admin-search"
-                          placeholder="Поиск по имени, почте или id…"
-                          value={memberSearch}
-                          onChange={(e) => setMemberSearch(e.target.value)}
-                          autoComplete="off"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="secondary small"
-                        onClick={() => refreshMembers()}
-                        disabled={membersLoading}
-                      >
-                        Обновить список
-                      </button>
-                    </div>
-                    <p className="muted small profile-admin-meta">
-                      В проекте: <strong>{memberRows.length}</strong>
-                      {memberSearch.trim() ? (
-                        <> · по запросу: <strong>{filteredMemberRows.length}</strong></>
-                      ) : null}
-                    </p>
-
-                    {filteredMemberRows.length === 0 ? (
-                      <p className="muted profile-admin-empty">
-                        {memberRows.length === 0
-                          ? 'Пока нет участников. Добавьте пользователя ниже.'
-                          : 'Никто не подходит под фильтр. Измените поисковый запрос.'}
-                      </p>
-                    ) : (
-                      <>
-                        <div className="role-management project-members-list">
-                          {paginatedMemberRows.map(({ uid, user: u, isOwner }) => (
-                            <div key={uid} className="role-row project-member-row">
-                              <div className="role-row-user">
-                                <strong>{u?.username || `#${uid}`}</strong>
-                                {isOwner && <span className="muted small"> (владелец)</span>}
-                                {u?.email ? (
-                                  <div className="muted small role-row-email">{u.email}</div>
-                                ) : null}
-                              </div>
-                              {!isOwner ? (
-                                <button
-                                  type="button"
-                                  className="danger small"
-                                  onClick={() => handleRemoveMember(uid)}
-                                >
-                                  Удалить
-                                </button>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-
-                        {memberTotalPages > 1 && (
-                          <div className="profile-admin-pagination">
-                            <button
-                              type="button"
-                              className="secondary small"
-                              disabled={memberPageSafe <= 1}
-                              onClick={() => setMemberPage((p) => Math.max(1, p - 1))}
-                            >
-                              Назад
-                            </button>
-                            <span className="muted small profile-admin-page-info">
-                              Стр. {memberPageSafe} из {memberTotalPages}
-                              {' · '}
-                              {(memberPageSafe - 1) * PROJECT_MEMBERS_PAGE_SIZE + 1}
-                              –
-                              {Math.min(memberPageSafe * PROJECT_MEMBERS_PAGE_SIZE, filteredMemberRows.length)}
-                              {' '}
-                              из {filteredMemberRows.length}
-                            </span>
-                            <button
-                              type="button"
-                              className="secondary small"
-                              disabled={memberPageSafe >= memberTotalPages}
-                              onClick={() => setMemberPage((p) => Math.min(memberTotalPages, p + 1))}
-                            >
-                              Вперёд
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <form onSubmit={handleAddMember} className="project-members-invite">
-                      <div className="form-group">
-                        <label htmlFor="project-add-member">Добавить участника</label>
-                        <select
-                          id="project-add-member"
-                          value={memberToAdd}
-                          onChange={(e) => setMemberToAdd(e.target.value)}
-                        >
-                          <option value="">— выбрать пользователя —</option>
-                          {users
-                            .filter((u) => !(projectMembers || []).includes(u.id))
-                            .map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.username}{u.email ? ` (${u.email})` : ''}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div className="form-actions">
-                        <button type="submit" disabled={inviting || !memberToAdd}>
-                          {inviting ? 'Добавление...' : 'Добавить в проект'}
-                        </button>
-                      </div>
-                    </form>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
+          <ProjectMembersSection
+            pageSize={PROJECT_MEMBERS_PAGE_SIZE}
+            membersPanelOpen={membersPanelOpen}
+            onTogglePanel={() => setMembersPanelOpen((v) => !v)}
+            membersLoading={membersLoading}
+            memberSearch={memberSearch}
+            onMemberSearchChange={setMemberSearch}
+            onRefreshMembers={refreshMembers}
+            memberRows={memberRows}
+            filteredMemberRows={filteredMemberRows}
+            paginatedMemberRows={paginatedMemberRows}
+            memberTotalPages={memberTotalPages}
+            memberPageSafe={memberPageSafe}
+            onMemberPageChange={setMemberPage}
+            onRemoveMember={handleRemoveMember}
+            users={users}
+            projectMembers={projectMembers}
+            memberToAdd={memberToAdd}
+            onMemberToAddChange={setMemberToAdd}
+            onAddMemberSubmit={handleAddMember}
+            inviting={inviting}
+          />
         )}
 
-        {showTaskForm && (
-          <section className="card profile-section" aria-labelledby="project-new-task-heading">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="project-new-task-heading">Новая задача</h2>
-            </div>
-            <form onSubmit={handleCreateTask}>
-              <div className="form-group">
-                <label htmlFor="project-task-title">Название</label>
-                <input
-                  id="project-task-title"
-                  type="text"
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  required
-                  placeholder="Название задачи"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="project-task-desc">Описание</label>
-                <textarea
-                  id="project-task-desc"
-                  value={taskDescription}
-                  onChange={(e) => setTaskDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Описание (необязательно)"
-                />
-              </div>
-              <div className="form-row tasks-filters-row">
-                <div className="form-group">
-                  <label>Статус</label>
-                  <select
-                    value={taskStatus}
-                    onChange={(e) => setTaskStatus(e.target.value)}
-                  >
-                    {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Исполнитель</label>
-                  {isExecutor ? (
-                    <select value={user?.userId || ''} disabled>
-                      <option value={user?.userId}>{user?.username || `#${user?.userId}`}</option>
-                    </select>
-                  ) : (
-                    <select
-                      value={taskAssigneeId}
-                      onChange={(e) => setTaskAssigneeId(e.target.value)}
-                    >
-                      <option value="">— не назначен —</option>
-                      {(projectMembers || [])
-                        .map((uid) => users.find((u) => u.id === uid))
-                        .filter(Boolean)
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>{u.username}</option>
-                        ))}
-                    </select>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Срок</label>
-                  <input
-                    type="datetime-local"
-                    value={taskDueDate}
-                    onChange={(e) => setTaskDueDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="form-actions">
-                <button type="button" className="secondary" onClick={() => setShowTaskForm(false)}>
-                  Отмена
-                </button>
-                <button type="submit" disabled={submitLoading}>
-                  {submitLoading ? 'Создание...' : 'Создать задачу'}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
+        <ProjectNewTaskSection
+          showTaskForm={showTaskForm}
+          onClose={() => setShowTaskForm(false)}
+          taskTitle={taskTitle}
+          setTaskTitle={setTaskTitle}
+          taskDescription={taskDescription}
+          setTaskDescription={setTaskDescription}
+          taskStatus={taskStatus}
+          setTaskStatus={setTaskStatus}
+          taskAssigneeId={taskAssigneeId}
+          setTaskAssigneeId={setTaskAssigneeId}
+          taskDueDate={taskDueDate}
+          setTaskDueDate={setTaskDueDate}
+          isExecutor={isExecutor}
+          user={user}
+          projectMembers={projectMembers}
+          users={users}
+          submitLoading={submitLoading}
+          onSubmit={handleCreateTask}
+        />
 
-        <section className="card profile-section" aria-labelledby="project-task-filters-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="project-task-filters-heading">Фильтры списка задач</h2>
-          </div>
-          <div className="form-row tasks-filters-row">
-            <div className="form-group">
-              <label htmlFor="project-filter-status">Статус</label>
-              <select
-                id="project-filter-status"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="">Любой</option>
-                {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="project-filter-assignee">Исполнитель</label>
-              <select
-                id="project-filter-assignee"
-                value={filterAssigneeId}
-                onChange={(e) => setFilterAssigneeId(e.target.value)}
-              >
-                <option value="">Все</option>
-                {(projectMembers || [])
-                  .map((uid) => users.find((u) => u.id === uid))
-                  .filter(Boolean)
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>{u.username}</option>
-                  ))}
-              </select>
-            </div>
-          </div>
-        </section>
+        <ProjectTaskFiltersSection
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          filterAssigneeId={filterAssigneeId}
+          setFilterAssigneeId={setFilterAssigneeId}
+          projectMembers={projectMembers}
+          users={users}
+        />
 
-        <section className="card profile-section" aria-labelledby="project-tasks-list-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="project-tasks-list-heading">Задачи проекта ({tasks.length})</h2>
-          </div>
-          {tasks.length === 0 ? (
-            <p className="muted tasks-empty">Нет задач по выбранным фильтрам. Создайте первую задачу.</p>
-          ) : (
-            <ul className="task-list project-detail-task-list">
-              {tasks.map((t) => (
-                <li key={t.id} className="card task-list-item">
-                  <div className="task-item-content">
-                    <div className="task-item-header">
-                      <Link to={`/tasks/${t.id}`} className="task-title">
-                        {t.title}
-                      </Link>
-                      <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
-                        {STATUS_LABELS[t.status] || t.status}
-                      </span>
-                    </div>
-                    <div className="task-item-meta">
-                      <span className="meta-chip">Исполнитель: {t.assigneeId ? userName(t.assigneeId) : '—'}</span>
-                      <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
-                    </div>
-                  </div>
-                  <Link to={`/tasks/${t.id}`} className="btn-link">
-                    Открыть →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <ProjectTasksListSection tasks={tasks} userName={userName} />
       </div>
     </Layout>
   );

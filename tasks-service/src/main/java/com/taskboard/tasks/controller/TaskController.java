@@ -1,28 +1,15 @@
 package com.taskboard.tasks.controller;
 
+import com.taskboard.tasks.dto.TaskWriteDto;
 import com.taskboard.tasks.entity.Task;
-import com.taskboard.tasks.entity.Project;
-import com.taskboard.tasks.repository.ProjectMemberRepository;
-import com.taskboard.tasks.repository.ProjectRepository;
-import com.taskboard.tasks.repository.TaskRepository;
-import com.taskboard.tasks.service.TaskService;
-import com.taskboard.tasks.security.RoleAuthorization;
+import com.taskboard.tasks.service.TaskCommandService;
+import com.taskboard.tasks.service.TaskQueryService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -30,10 +17,8 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class TaskController {
 
-    private final TaskRepository taskRepository;
-    private final ProjectRepository projectRepository;
-    private final TaskService taskService;
-    private final ProjectMemberRepository projectMemberRepository;
+    private final TaskQueryService taskQueryService;
+    private final TaskCommandService taskCommandService;
 
     @GetMapping
     public ResponseEntity<?> list(
@@ -44,167 +29,28 @@ public class TaskController {
             @RequestParam(defaultValue = "20") int size,
             Authentication auth
     ) {
-        Long userId = RoleAuthorization.userId(auth);
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-        var pageable = PageRequest.of(page, size);
-
-        if (isExecutor) {
-            List<Long> allowedProjectIds = projectMemberRepository.findProjectIdsByUserId(userId);
-            if (allowedProjectIds == null || allowedProjectIds.isEmpty()) {
-                return ResponseEntity.ok(Page.empty(pageable));
-            }
-
-            // Внутри доступных проектов EXECUTOR видит задачи всех пользователей.
-            if (projectId != null) {
-                if (!allowedProjectIds.contains(projectId)) {
-                    return ResponseEntity.ok(Page.empty(pageable));
-                }
-                Page<Task> result = taskRepository.findByProjectAndFilters(projectId, status, assigneeId, pageable);
-                return ResponseEntity.ok(result);
-            }
-
-            // Если фильтр по проекту не выбран — показываем задачи во всех проектах, где есть назначенные ему задачи.
-            Page<Task> result = taskRepository.findByProjectIdsAndFilters(allowedProjectIds, status, assigneeId, pageable);
-            return ResponseEntity.ok(result);
-        }
-
-        if (projectId != null) {
-            Page<Task> result = taskRepository.findByProjectAndFilters(projectId, status, assigneeId, pageable);
-            return ResponseEntity.ok(result);
-        }
-        if (assigneeId != null) {
-            return ResponseEntity.ok(taskRepository.findByAssigneeId(assigneeId));
-        }
-        return ResponseEntity.ok(taskRepository.findAll(pageable));
+        return taskQueryService.listTasks(projectId, status, assigneeId, page, size, auth);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Task> get(@PathVariable Long id, Authentication auth) {
-        Long userId = RoleAuthorization.userId(auth);
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-
-        return taskRepository.findByIdWithProject(id)
-                .map(task -> {
-                    if (isExecutor) {
-                        Long taskProjectId = task.getProjectId();
-                        if (taskProjectId == null || !projectMemberRepository.existsByIdProjectIdAndIdUserId(taskProjectId, userId)) {
-                            return ResponseEntity.status(HttpStatus.NOT_FOUND).<Task>build();
-                        }
-                    }
-                    return ResponseEntity.ok(task);
-                })
-                .orElse(ResponseEntity.notFound().build());
+        return taskQueryService.getTask(id, auth);
     }
 
     @PostMapping
-    public ResponseEntity<Task> create(@Valid @RequestBody TaskDto dto, Authentication auth) {
-        Long userId = (Long) auth.getPrincipal();
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-        Long safeAssigneeId = isExecutor ? userId : dto.getAssigneeId();
-
-        Project project = projectRepository.findById(dto.getProjectId()).orElse(null);
-        if (project == null) return ResponseEntity.notFound().build();
-
-        if (isExecutor) {
-            boolean isMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(project.getId(), userId);
-            if (!isMember) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Вы не состоите в этом проекте");
-            }
-        } else {
-            // Для ADMIN/MANAGER: назначать задачу можно только участнику проекта.
-            if (dto.getAssigneeId() != null) {
-                boolean assigneeIsMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(project.getId(), dto.getAssigneeId());
-                if (!assigneeIsMember) {
-                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Исполнитель должен быть участником проекта");
-                }
-            }
-        }
-
-        Task task = Task.builder()
-                .title(dto.getTitle())
-                .description(dto.getDescription())
-                .status(dto.getStatus() != null ? dto.getStatus() : Task.TaskStatus.OPEN)
-                .assigneeId(safeAssigneeId)
-                .dueDate(dto.getDueDate())
-                .createdBy(userId)
-                .project(project)
-                .build();
-
-        task = taskRepository.save(task);
-        taskService.notifyTaskCreated(task, userId);
-        return ResponseEntity.status(201).body(task);
+    public ResponseEntity<Task> create(@Valid @RequestBody TaskWriteDto dto, Authentication auth) {
+        return taskCommandService.create(dto, auth);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Task> update(@PathVariable Long id,
-                                       @Valid @RequestBody TaskDto dto,
+                                       @Valid @RequestBody TaskWriteDto dto,
                                        Authentication auth) {
-        Long userId = RoleAuthorization.userId(auth);
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-
-        Task existing = taskRepository.findByIdWithProject(id)
-                .orElse(null);
-        if (existing == null) return ResponseEntity.notFound().build();
-
-        if (isExecutor) {
-            // EXECUTOR может обновлять только задачи, назначенные ему.
-            if (existing.getAssigneeId() == null || !existing.getAssigneeId().equals(userId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Редактировать можно только задачи, назначенные на вас");
-            }
-            // EXECUTOR не может пере назначать задачу на другого пользователя.
-            dto.setAssigneeId(existing.getAssigneeId());
-        } else {
-            // ADMIN/MANAGER: исполнитель должен быть участником проекта задачи (как при создании).
-            if (dto.getAssigneeId() != null) {
-                Long projectId = existing.getProjectId();
-                if (projectId == null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "У задачи не задан проект");
-                }
-                boolean assigneeIsMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(projectId, dto.getAssigneeId());
-                if (!assigneeIsMember) {
-                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Исполнитель должен быть участником проекта");
-                }
-            }
-        }
-
-        Task updated = Task.builder()
-                .title(dto.getTitle())
-                .description(dto.getDescription())
-                .status(dto.getStatus())
-                .assigneeId(dto.getAssigneeId())
-                .dueDate(dto.getDueDate())
-                .build();
-
-        Task saved = taskService.updateTask(id, updated, userId);
-        return ResponseEntity.ok(saved);
+        return taskCommandService.update(id, dto, auth);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication auth) {
-        Long userId = RoleAuthorization.userId(auth);
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-        if (!taskRepository.existsById(id)) return ResponseEntity.notFound().build();
-
-        // EXECUTOR может удалить только задачи, назначенные ему или им созданные.
-        if (isExecutor) {
-            Task task = taskRepository.findById(id).orElse(null);
-            if (task == null) return ResponseEntity.notFound().build();
-            boolean allowed = (task.getAssigneeId() != null && task.getAssigneeId().equals(userId))
-                    || (task.getCreatedBy() != null && task.getCreatedBy().equals(userId));
-            if (!allowed) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        taskRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @Data
-    public static class TaskDto {
-        private Long projectId;
-        @NotBlank private String title;
-        private String description;
-        private Task.TaskStatus status;
-        private Long assigneeId;
-        private Instant dueDate;
+        return taskCommandService.delete(id, auth);
     }
 }

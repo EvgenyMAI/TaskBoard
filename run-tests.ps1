@@ -1,7 +1,9 @@
 param(
   [switch]$BackendOnly,
   [switch]$E2EOnly,
-  [switch]$VerboseBackendLogs
+  [switch]$VerboseBackendLogs,
+  # Запуск Maven на хосте (нужны JDK 17 и `mvn` в PATH). Быстрее, чем холодный Docker; кэш — `.cache/m2/repository`.
+  [switch]$UseHostMaven
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,69 +44,200 @@ function RunWithRetry([string]$cmd, [int]$retries = 3, [int]$sleepSeconds = 5) {
   }
 }
 
-function RunDockerMvnTest([string]$servicePath, [string]$mvnImage) {
-  $src = $servicePath
-  $serviceName = Split-Path -Leaf $servicePath
-  $serviceStart = Get-Date
-  $logPath = Join-Path $script:runLogDir ($serviceName + ".log")
-  Info "docker run (mvn test) in $src"
-  $output = New-Object System.Collections.Generic.List[string]
-  $lastHeartbeat = Get-Date
-  $heartbeatEverySec = 15
-
-  # Route through cmd so stderr/stdout are merged before PowerShell processes streams.
-  $dockerCmd = @(
-    "docker run --rm"
-    ("--mount ""type=bind,source={0},target=/work""" -f $src)
-    ("--mount ""type=bind,source={0},target=/root/.m2""" -f $script:mavenCacheDir)
-    "-w /work"
-    $mvnImage
-    "mvn -B test 2>&1"
-  ) -join " "
-
-  try {
-    & cmd /c $dockerCmd | ForEach-Object {
-        $line = "$_"
-        $output.Add($line) | Out-Null
-
-        if ($VerboseBackendLogs) {
-          Write-Host $line
-        } else {
-          if ($line -match "^\[INFO\] (Tests run:|BUILD SUCCESS|BUILD FAILURE|Total time:|Finished at:|Results:|Running )") {
-            Write-Host $line
-          }
-        }
-
-        $elapsedNow = [math]::Round(((Get-Date) - $serviceStart).TotalSeconds, 0)
-        if ($elapsedNow -gt 0 -and (((Get-Date) - $lastHeartbeat).TotalSeconds -ge $heartbeatEverySec)) {
-          Write-Host ("   ... {0} still running ({1}s)" -f $serviceName, $elapsedNow)
-          $lastHeartbeat = Get-Date
+function Get-SurefireResultsTestCount([System.Collections.Generic.List[string]]$Lines) {
+  $sum = 0
+  for ($i = 0; $i -lt $Lines.Count; $i++) {
+    if ($Lines[$i] -match '^\[INFO\] Results:\s*$') {
+      for ($j = $i + 1; $j -lt [Math]::Min($i + 8, $Lines.Count); $j++) {
+        if ($Lines[$j] -match '^\[INFO\] Tests run:\s*(\d+)') {
+          $sum += [int]$Matches[1]
+          break
         }
       }
-    $exitCode = $LASTEXITCODE
-  } finally { }
+    }
+  }
+  return $sum
+}
+
+function Complete-MavenBackendRun(
+  [System.Collections.Generic.List[string]]$output,
+  [int]$exitCode,
+  [string]$serviceName,
+  [string]$logPath,
+  [DateTime]$serviceStart,
+  [int]$MinResultsTestCount,
+  [string]$sourceHint
+) {
+  foreach ($line in $output) {
+    if ($VerboseBackendLogs) {
+      Write-Host $line
+    } else {
+      if ($line -match "^\[INFO\] (Tests run:|BUILD SUCCESS|BUILD FAILURE|Total time:|Finished at:|Results:|Running )") {
+        Write-Host $line
+      }
+    }
+  }
+  Write-Host ("   ... {0} finished in {1}s (output lines: {2})" -f $serviceName, [math]::Round(((Get-Date) - $serviceStart).TotalSeconds, 0), $output.Count)
 
   $output | Out-File -FilePath $logPath -Encoding utf8
 
   $elapsedSec = [math]::Round(((Get-Date) - $serviceStart).TotalSeconds, 1)
+  $resultsSum = Get-SurefireResultsTestCount $output
   $testsLine = ($output | Where-Object { $_ -match "^\[INFO\] Tests run:" } | Select-Object -Last 1)
   $totalLine = ($output | Where-Object { $_ -match "^\[INFO\] Total time:" } | Select-Object -Last 1)
-  $status = if ($exitCode -eq 0) { "PASS" } else { "FAIL" }
+  $hasBuildFailure = ($output | Where-Object { $_ -match '^\[INFO\] BUILD FAILURE' } | Select-Object -First 1)
+
+  $failReasons = New-Object System.Collections.Generic.List[string]
+  if ($exitCode -ne 0) { [void]$failReasons.Add("mvn exit code $exitCode") }
+  if ($hasBuildFailure) { [void]$failReasons.Add("log contains BUILD FAILURE") }
+  if ($MinResultsTestCount -gt 0 -and $resultsSum -lt $MinResultsTestCount) {
+    [void]$failReasons.Add(("sum of [INFO] Results test counts is {0} (expected >= {1})" -f $resultsSum, $MinResultsTestCount))
+  }
+
+  $status = if ($failReasons.Count -eq 0) { "PASS" } else { "FAIL" }
 
   $script:backendResults += [PSCustomObject]@{
     Service = $serviceName
     Status = $status
-    Tests = if ($testsLine) { $testsLine.Trim() } else { "n/a" }
+    Tests = ("Results-sum={0} | last line: {1}" -f $resultsSum, ($(if ($testsLine) { $testsLine.Trim() } else { "n/a" })))
     Time = if ($totalLine) { $totalLine.Trim() } else { "n/a" }
     ElapsedSec = $elapsedSec
     Elapsed = "$elapsedSec s"
     Log = $logPath
+    ExitCode = $exitCode
+    ResultsTestSum = $resultsSum
   }
 
-  Write-Host ("   -> {0} | {1} | {2}" -f $serviceName, $status, $testsLine)
+  Write-Host ("   -> {0} | {1} | Results-sum={2} | exit={3}" -f $serviceName, $status, $resultsSum, $exitCode)
+  if ($testsLine) { Write-Host ("   -> last Tests run line: {0}" -f $testsLine.Trim()) }
   Write-Host ("   -> Full log: {0}" -f $logPath)
 
-  if ($exitCode -ne 0) { throw "mvn test failed for $src (see $logPath)" }
+  if ($failReasons.Count -gt 0) {
+    throw ("mvn test failed for {0}: {1} (see {2})" -f $sourceHint, ($failReasons -join "; "), $logPath)
+  }
+}
+
+function RunDockerMvnTest(
+  [string]$servicePath,
+  [string]$mvnImage,
+  [string]$mvnCli = "mvn -B test",
+  [string]$logLabel = $null,
+  [int]$MinResultsTestCount = 0
+) {
+  $src = $servicePath
+  $serviceName = if ($logLabel) { $logLabel } else { Split-Path -Leaf $servicePath }
+  $serviceStart = Get-Date
+  $logPath = Join-Path $script:runLogDir ($serviceName + ".log")
+
+  # Do not pass shell redirection (2>&1) into the container: it becomes stray Maven args and breaks runs.
+  $mvnSanitized = ($mvnCli -replace '(?i)\s+2>&1\s*$', '').Trim()
+
+  Info ("docker run ({0}) bind={1}" -f $mvnSanitized, $src)
+
+  $mvnArgs = @()
+  foreach ($tok in ($mvnSanitized -split '\s+')) {
+    if ([string]::IsNullOrWhiteSpace($tok)) { continue }
+    $mvnArgs += $tok
+  }
+
+  # Forward slashes avoid "docker: invalid reference format" when bind paths contain "C:\..." (colon/backslash).
+  $srcNorm = ($src -replace '\\', '/')
+  $m2Norm = ($script:mavenCacheDir -replace '\\', '/')
+
+  $dockerArgs = @(
+    "run", "--rm",
+    "--mount", ("type=bind,source={0},target=/work" -f $srcNorm),
+    "--mount", ("type=bind,source={0},target=/root/.m2" -f $m2Norm),
+    "-w", "/work",
+    $mvnImage
+  ) + $mvnArgs
+
+  $outFile = Join-Path $env:TEMP ("taskboard-mvn-" + [Guid]::NewGuid().ToString("N") + ".log")
+  Remove-Item -Path $outFile -ErrorAction SilentlyContinue
+  $dockerExe = (Get-Command docker.exe -ErrorAction SilentlyContinue)
+  if (-not $dockerExe) { $dockerExe = (Get-Command docker -ErrorAction Stop) }
+  # JVM writes warnings to stderr; with $ErrorActionPreference=Stop PowerShell would abort unless we relax for this call.
+  $prevEap = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    # Redirect without piping (pipeline would break $LASTEXITCODE on Windows PowerShell 5.1).
+    & $dockerExe.Source @dockerArgs > $outFile 2>&1
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $prevEap
+  }
+
+  $output = New-Object System.Collections.Generic.List[string]
+  if (Test-Path $outFile) {
+    Get-Content -Path $outFile -ErrorAction SilentlyContinue | ForEach-Object { [void]$output.Add($_) }
+  }
+  Remove-Item -Path $outFile -ErrorAction SilentlyContinue
+
+  Complete-MavenBackendRun -output $output -exitCode $exitCode -serviceName $serviceName -logPath $logPath `
+    -serviceStart $serviceStart -MinResultsTestCount $MinResultsTestCount -sourceHint $src
+}
+
+function RunHostMvnTest(
+  [string]$workDir,
+  [string]$mvnCli = "mvn -B test",
+  [string]$logLabel = $null,
+  [int]$MinResultsTestCount = 0
+) {
+  $mvnCmd = Get-Command mvn -ErrorAction SilentlyContinue
+  if (-not $mvnCmd) { throw "UseHostMaven: Maven (mvn) not found in PATH." }
+
+  $serviceName = if ($logLabel) { $logLabel } else { Split-Path -Leaf $workDir }
+  $serviceStart = Get-Date
+  $logPath = Join-Path $script:runLogDir ($serviceName + ".log")
+
+  $mvnSanitized = ($mvnCli -replace '(?i)\s+2>&1\s*$', '').Trim()
+  $toks = New-Object System.Collections.Generic.List[string]
+  foreach ($tok in ($mvnSanitized -split '\s+')) {
+    if ([string]::IsNullOrWhiteSpace($tok)) { continue }
+    [void]$toks.Add($tok)
+  }
+  if ($toks.Count -gt 0 -and $toks[0] -match '(?i)^mvn$') {
+    $toks.RemoveAt(0)
+  }
+
+  $repoLocal = Join-Path $script:mavenCacheDir "repository"
+  New-Item -ItemType Directory -Path $repoLocal -Force | Out-Null
+  $mvnArgs = New-Object System.Collections.Generic.List[string]
+  [void]$mvnArgs.Add(("-Dmaven.repo.local={0}" -f $repoLocal))
+  foreach ($t in $toks) { [void]$mvnArgs.Add($t) }
+
+  Info ("host mvn ({0}) cwd={1}" -f (($mvnArgs | ForEach-Object { $_ }) -join ' '), $workDir)
+
+  $javaVer = $null
+  try {
+    $javaVer = & java -version 2>&1 | Out-String
+  } catch { }
+  if ($javaVer -and $javaVer -notmatch 'version "17') {
+    Info "Warning: `java -version` does not look like JDK 17; host Maven may fail or behave oddly."
+  }
+
+  $outFile = Join-Path $env:TEMP ("taskboard-mvn-" + [Guid]::NewGuid().ToString("N") + ".log")
+  Remove-Item -Path $outFile -ErrorAction SilentlyContinue
+
+  $prevEap = $ErrorActionPreference
+  Push-Location $workDir
+  try {
+    $ErrorActionPreference = "Continue"
+    & mvn @($mvnArgs.ToArray()) > $outFile 2>&1
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $prevEap
+    Pop-Location
+  }
+
+  $output = New-Object System.Collections.Generic.List[string]
+  if (Test-Path $outFile) {
+    Get-Content -Path $outFile -ErrorAction SilentlyContinue | ForEach-Object { [void]$output.Add($_) }
+  }
+  Remove-Item -Path $outFile -ErrorAction SilentlyContinue
+
+  Complete-MavenBackendRun -output $output -exitCode $exitCode -serviceName $serviceName -logPath $logPath `
+    -serviceStart $serviceStart -MinResultsTestCount $MinResultsTestCount -sourceHint $workDir
 }
 
 function PrintBackendSummary() {
@@ -113,6 +246,8 @@ function PrintBackendSummary() {
   foreach ($r in $script:backendResults) {
     Write-Host ("[{0}] {1}" -f $r.Status, $r.Service)
     Write-Host ("  {0}" -f $r.Tests)
+    if ($null -ne $r.ResultsTestSum) { Write-Host ("  Results-sum (Surefire modules): {0}" -f $r.ResultsTestSum) }
+    if ($null -ne $r.ExitCode) { Write-Host ("  exit code: {0}" -f $r.ExitCode) }
     Write-Host ("  {0}" -f $r.Time)
     Write-Host ("  elapsed: {0}" -f $r.Elapsed)
     Write-Host ("  log: {0}" -f $r.Log)
@@ -125,8 +260,11 @@ function PrintBackendKpi() {
   $passed = ($script:backendResults | Where-Object { $_.Status -eq "PASS" }).Count
   $failed = ($script:backendResults | Where-Object { $_.Status -eq "FAIL" }).Count
   $elapsedSum = [math]::Round((($script:backendResults | Measure-Object -Property ElapsedSec -Sum).Sum), 1)
+  $testsSum = [math]::Round((($script:backendResults | Measure-Object -Property ResultsTestSum -Sum).Sum), 0)
   Info "Backend KPI"
-  Write-Host ("services: {0} | pass: {1} | fail: {2} | total elapsed: {3} s" -f $total, $passed, $failed, $elapsedSum)
+  Write-Host ("maven runs: {0} | pass: {1} | fail: {2} | Results-sum total: {3} | wall elapsed: {4} s" -f $total, $passed, $failed, $testsSum, $elapsedSum)
+  # ASCII only: Windows PowerShell 5.1 may mis-parse UTF-8 without BOM (typographic dash broke the line above).
+  Write-Host '  (auth-service: separate run; tasks-service + analytics-service: one reactor run, see tasks-and-analytics.log)'
   Write-Host ("logs: {0}" -f $script:runLogDir)
   Write-Host ("maven cache: {0}" -f $script:mavenCacheDir)
 }
@@ -166,25 +304,19 @@ function GetFreeTcpPort() {
   return $port
 }
 
-function EnsureEnvPort([string]$name) {
-  if (-not (Test-Path ("env:" + $name))) {
-    Set-Item -Path ("env:" + $name) -Value (GetFreeTcpPort).ToString()
-  } else {
-    $val = (Get-Item ("env:" + $name)).Value
-    if ([string]::IsNullOrWhiteSpace($val)) {
-      Set-Item -Path ("env:" + $name) -Value (GetFreeTcpPort).ToString()
-    }
-  }
-}
-
 if (-not $E2EOnly) {
-  Info "Backend tests (H2, Spring profile: test) via Docker Maven"
+  if ($UseHostMaven) {
+    Info 'Backend tests (H2, Spring profile test) via host Maven; .cache/m2/repository; JDK 17 + mvn on PATH'
+    RunHostMvnTest (Join-Path $workRoot "auth-service") "mvn -B test" "auth-service" 1
+    RunHostMvnTest $workRoot "mvn -B -pl tasks-service,analytics-service -am test" "tasks-and-analytics" 25
+  } else {
+    Info 'Backend tests (H2, Spring profile test) via Docker Maven'
 
-  $mvnImage = "maven:3.9-eclipse-temurin-17-alpine"
+    $mvnImage = "maven:3.9-eclipse-temurin-17-alpine"
 
-  RunDockerMvnTest (Join-Path $workRoot "auth-service") $mvnImage
-  RunDockerMvnTest (Join-Path $workRoot "tasks-service") $mvnImage
-  RunDockerMvnTest (Join-Path $workRoot "analytics-service") $mvnImage
+    RunDockerMvnTest (Join-Path $workRoot "auth-service") $mvnImage "mvn -B test" $null 1
+    RunDockerMvnTest $workRoot $mvnImage "mvn -B -pl tasks-service,analytics-service -am test" "tasks-and-analytics" 25
+  }
   PrintBackendSummary
   PrintBackendKpi
 }
@@ -195,43 +327,93 @@ if ($BackendOnly) {
 }
 
 if (-not $E2EOnly) {
+  Info "Frontend unit tests (Vitest)"
+  Push-Location (Join-Path $workRoot "frontend")
+  try {
+    Run "npm install"
+    Run "npm run test"
+  } finally {
+    Pop-Location
+  }
+}
+
+if (-not $E2EOnly) {
   Info "E2E (Playwright) preparation"
 }
 
 if (-not $BackendOnly) {
   # Bring up backend stack needed for e2e
   Push-Location $workRoot
+  $savedComposePorts = @{}
+  $composePortVarNames = @(
+    "POSTGRES_AUTH_PORT", "POSTGRES_TASKS_PORT", "POSTGRES_ANALYTICS_PORT",
+    "MINIO_PORT", "MINIO_CONSOLE_PORT", "AUTH_SERVICE_PORT", "TASKS_SERVICE_PORT", "ANALYTICS_SERVICE_PORT"
+  )
+  $e2eEnvFile = $null
   try {
-    # Avoid port conflicts with already running local stack.
-    EnsureEnvPort "POSTGRES_AUTH_PORT"
-    EnsureEnvPort "POSTGRES_TASKS_PORT"
-    EnsureEnvPort "POSTGRES_ANALYTICS_PORT"
-    EnsureEnvPort "MINIO_PORT"
-    EnsureEnvPort "MINIO_CONSOLE_PORT"
-    EnsureEnvPort "AUTH_SERVICE_PORT"
-    EnsureEnvPort "TASKS_SERVICE_PORT"
-    EnsureEnvPort "ANALYTICS_SERVICE_PORT"
-    EnsureEnvPort "FRONTEND_PORT"
+    # Docker Compose prefers shell env over defaults: random ports from a previous run-tests session
+    # would stick in process environment variables and break local npm run dev. Use a temp --env-file only.
+    foreach ($name in $composePortVarNames) {
+      if (Test-Path ("env:" + $name)) {
+        $savedComposePorts[$name] = (Get-Item ("env:" + $name)).Value
+        Remove-Item ("env:" + $name) -ErrorAction SilentlyContinue
+      }
+    }
+
+    $e2eEnvFile = Join-Path $workRoot (".env.e2e." + [Guid]::NewGuid().ToString("N") + ".tmp")
+    $e2eLines = New-Object System.Collections.Generic.List[string]
+    foreach ($name in $composePortVarNames) {
+      [void]$e2eLines.Add("${name}=$((GetFreeTcpPort).ToString())")
+    }
+    $e2eLines | Set-Content -Path $e2eEnvFile -Encoding ascii
+
+    $portMap = @{}
+    Get-Content $e2eEnvFile | ForEach-Object {
+      if ($_ -match "^([^=]+)=(.+)$") { $portMap[$Matches[1].Trim()] = $Matches[2].Trim() }
+    }
+    $frontendPort = GetFreeTcpPort
 
     # Pre-pull MinIO image (helps avoid transient 'latest' fetch issues).
     RunWithRetry "docker pull minio/minio:latest" 3 5
 
     # Compose up with retry (Docker Desktop/Hub can be flaky).
-    RunWithRetry "docker compose up -d --build" 3 5
+    RunWithRetry "docker compose --env-file `"$e2eEnvFile`" up -d --build" 3 5
+
+    Info "Verify tasks-service and analytics-service containers stay running (not Exited)"
+    $deadline = (Get-Date).AddSeconds(120)
+    while ((Get-Date) -lt $deadline) {
+      $ts = (& docker compose ps tasks-service --format "{{.State}}" 2>$null).Trim()
+      $an = (& docker compose ps analytics-service --format "{{.State}}" 2>$null).Trim()
+      if ($ts -match '(?i)^running' -and $an -match '(?i)^running') { break }
+      if ($ts -match '(?i)exited' -or $an -match '(?i)exited') {
+        Info "tasks-service state: $ts | analytics-service state: $an"
+        Run "docker compose logs tasks-service --tail 80"
+        Run "docker compose logs analytics-service --tail 80"
+        throw "tasks-service or analytics-service exited during startup. Rebuild images: docker compose build --no-cache tasks-service analytics-service"
+      }
+      Start-Sleep -Seconds 2
+    }
+    $tsFinal = (& docker compose ps tasks-service --format "{{.State}}" 2>$null).Trim()
+    $anFinal = (& docker compose ps analytics-service --format "{{.State}}" 2>$null).Trim()
+    if (-not ($tsFinal -match '(?i)^running' -and $anFinal -match '(?i)^running')) {
+      throw "tasks-service/analytics-service did not reach running state within 120s (tasks='$tsFinal', analytics='$anFinal')."
+    }
 
     Push-Location "frontend"
     try {
       Run "npm install"
       Run "npx playwright install --with-deps chromium"
 
-      # Use build+preview for stable e2e
-      $env:VITE_AUTH_API = "http://localhost:$($env:AUTH_SERVICE_PORT)/api/auth"
-      $env:VITE_USERS_API = "http://localhost:$($env:AUTH_SERVICE_PORT)/api/users"
-      $env:VITE_TASKS_API = "http://localhost:$($env:TASKS_SERVICE_PORT)/api"
-      $env:VITE_ANALYTICS_API = "http://localhost:$($env:ANALYTICS_SERVICE_PORT)/api"
+      # Use build+preview for stable e2e (same host ports as compose file for this run)
+      $pa = $portMap["AUTH_SERVICE_PORT"]
+      $pt = $portMap["TASKS_SERVICE_PORT"]
+      $pan = $portMap["ANALYTICS_SERVICE_PORT"]
+      $env:VITE_AUTH_API = "http://127.0.0.1:${pa}/api/auth"
+      $env:VITE_USERS_API = "http://127.0.0.1:${pa}/api/users"
+      $env:VITE_TASKS_API = "http://127.0.0.1:${pt}/api"
+      $env:VITE_ANALYTICS_API = "http://127.0.0.1:${pan}/api"
       Run "npm run build"
 
-      $frontendPort = (Get-Item "env:FRONTEND_PORT").Value
       Info "Starting frontend preview on http://127.0.0.1:$frontendPort"
       $npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue)
       if (-not $npmCmd) { $npmCmd = (Get-Command npm -ErrorAction SilentlyContinue) }
@@ -260,6 +442,7 @@ if (-not $BackendOnly) {
         $env:E2E_BASE_URL = ("http://127.0.0.1:" + $frontendPort)
         $env:E2E_AUTH_API = $env:VITE_AUTH_API
         $env:E2E_TASKS_API = $env:VITE_TASKS_API
+        $env:E2E_ANALYTICS_API = $env:VITE_ANALYTICS_API
         Run "npm run test:e2e"
       } finally {
         if ($preview -and -not $preview.HasExited) {
@@ -276,6 +459,12 @@ if (-not $BackendOnly) {
       Run "docker compose down -v"
     } catch {
       Info "compose down failed (ignored): $($_.Exception.Message)"
+    }
+    if ($e2eEnvFile -and (Test-Path $e2eEnvFile)) {
+      Remove-Item $e2eEnvFile -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($k in $savedComposePorts.Keys) {
+      Set-Item -Path ("env:" + $k) -Value $savedComposePorts[$k]
     }
     Pop-Location
   }

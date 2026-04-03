@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import { changeMyPassword, getMyProfile, getUsers, updateMyProfile, updateUserRoles } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import FormField from '../components/FormField';
 import Skeleton from '../components/Skeleton';
-import { roleLabel } from '../utils/roles';
+import { useClientPagination } from '../hooks/useClientPagination';
+import ProfilePageHero from '../components/profile/ProfilePageHero';
+import ProfileSettingsSection from '../components/profile/ProfileSettingsSection';
+import ProfilePasswordSection from '../components/profile/ProfilePasswordSection';
+import ProfileAdminRolesSection from '../components/profile/ProfileAdminRolesSection';
 
 const PASSWORD_CHANGE_PHRASE = 'I_CONFIRM_PASSWORD_CHANGE';
 const ADMIN_USERS_PAGE_SIZE = 12;
@@ -32,10 +35,8 @@ export default function ProfilePage() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminUsersLoading, setAdminUsersLoading] = useState(false);
   const [adminUsersError, setAdminUsersError] = useState(null);
-  /** После успешной загрузки списка не запрашиваем снова при повторном раскрытии (есть «Обновить»). */
   const adminUsersCacheOkRef = useRef(false);
   const [adminUserSearch, setAdminUserSearch] = useState('');
-  const [adminUserPage, setAdminUserPage] = useState(1);
   const [rolesSaving, setRolesSaving] = useState(false);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,6 +46,24 @@ export default function ProfilePage() {
   const phraseError = confirmationPhrase && confirmationPhrase !== PASSWORD_CHANGE_PHRASE
     ? 'Кодовая фраза введена неверно'
     : '';
+
+  const matchAdminUser = useCallback((u, q) => {
+    const un = (u.username || '').toLowerCase();
+    const em = (u.email || '').toLowerCase();
+    return un.includes(q) || em.includes(q);
+  }, []);
+
+  const {
+    filteredRows: filteredAdminUsers,
+    totalPages: adminUsersTotalPages,
+    page: adminUserPageSafe,
+    setPage: setAdminUserPage,
+    pageSlice: paginatedAdminUsers,
+  } = useClientPagination(adminUsers, {
+    pageSize: ADMIN_USERS_PAGE_SIZE,
+    search: adminUserSearch,
+    matchesSearch: matchAdminUser,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -84,38 +103,12 @@ export default function ProfilePage() {
     loadAdminUsers({ force: false });
   }, [isAdmin, rolesPanelOpen, loadAdminUsers]);
 
-  useEffect(() => {
-    setAdminUserPage(1);
-  }, [adminUserSearch]);
-
   const getPrimaryRole = (roles) => {
     const r = Array.isArray(roles) ? roles : [];
     if (r.includes('ADMIN')) return 'ADMIN';
     if (r.includes('MANAGER')) return 'MANAGER';
     return 'EXECUTOR';
   };
-
-  const filteredAdminUsers = useMemo(() => {
-    const q = adminUserSearch.trim().toLowerCase();
-    if (!q) return adminUsers;
-    return adminUsers.filter((u) => {
-      const un = (u.username || '').toLowerCase();
-      const em = (u.email || '').toLowerCase();
-      return un.includes(q) || em.includes(q);
-    });
-  }, [adminUsers, adminUserSearch]);
-
-  const adminUsersTotalPages = Math.max(1, Math.ceil(filteredAdminUsers.length / ADMIN_USERS_PAGE_SIZE));
-
-  useEffect(() => {
-    setAdminUserPage((p) => Math.min(p, adminUsersTotalPages));
-  }, [adminUsersTotalPages]);
-
-  const adminUserPageSafe = Math.min(adminUserPage, adminUsersTotalPages);
-  const paginatedAdminUsers = useMemo(() => {
-    const start = (adminUserPageSafe - 1) * ADMIN_USERS_PAGE_SIZE;
-    return filteredAdminUsers.slice(start, start + ADMIN_USERS_PAGE_SIZE);
-  }, [filteredAdminUsers, adminUserPageSafe]);
 
   const handleUpdateRoles = async (userId, nextRole) => {
     if (!isAdmin) return;
@@ -196,267 +189,68 @@ export default function ProfilePage() {
   return (
     <Layout>
       <div className="container page-width profile-page">
-        <header className="card profile-hero">
-          <div className="profile-hero-main">
-            <div className="profile-avatar" aria-hidden="true">{avatarLetter}</div>
-            <div className="profile-hero-text">
-              <h1>Личный кабинет</h1>
-              <div className="profile-hero-line">
-                <p className="profile-hero-sub">{username || 'Пользователь'}</p>
-                <div className="profile-role-chips" aria-label="Роли в системе">
-                  {profile?.roles?.length
-                    ? profile.roles.map((r) => (
-                      <span key={r} className="profile-role-chip">{roleLabel(r)}</span>
-                    ))
-                    : <span className="muted small profile-role-chips-empty">Роли не назначены</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-          <p className="muted small profile-hero-hint">
-            {isAdmin
-              ? 'Имя, почта и пароль. Ниже можно менять роли пользователей.'
-              : 'Имя, почта и пароль вашей учётной записи.'}
-          </p>
-        </header>
+        <ProfilePageHero
+          avatarLetter={avatarLetter}
+          username={username}
+          profile={profile}
+          isAdmin={isAdmin}
+        />
 
         {error && <p className="error profile-global-error">{error}</p>}
 
-        <section className="card profile-section" aria-labelledby="profile-settings-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="profile-settings-heading">Данные профиля</h2>
-          </div>
-          <form onSubmit={handleSaveProfile}>
-            <FormField label="Имя пользователя" error={touched.username && usernameError ? usernameError : ''}>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onBlur={() => setTouched((prev) => ({ ...prev, username: true }))}
-                className={touched.username && usernameError ? 'input-invalid' : ''}
-                minLength={2}
-                maxLength={100}
-                required
-              />
-            </FormField>
-            <FormField label="Почта" error={touched.email && emailError ? emailError : ''}>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
-                className={touched.email && emailError ? 'input-invalid' : ''}
-                required
-              />
-            </FormField>
-            <div className="form-actions">
-              <button type="submit" disabled={profileSaving || Boolean(usernameError || emailError)}>
-                {profileSaving ? 'Сохранение...' : 'Сохранить изменения'}
-              </button>
-            </div>
-          </form>
-        </section>
+        <ProfileSettingsSection
+          username={username}
+          email={email}
+          usernameError={usernameError}
+          emailError={emailError}
+          touched={touched}
+          profileSaving={profileSaving}
+          onSubmit={handleSaveProfile}
+          onUsernameChange={setUsername}
+          onEmailChange={setEmail}
+          onUsernameBlur={() => setTouched((prev) => ({ ...prev, username: true }))}
+          onEmailBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+        />
 
-        <section className="card profile-section" aria-labelledby="profile-password-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="profile-password-heading">Безопасность</h2>
-          </div>
-          <p className="muted small">
-            Для смены пароля введите кодовую фразу: <code className="profile-code">{PASSWORD_CHANGE_PHRASE}</code>
-          </p>
-          <form onSubmit={handleChangePassword}>
-            <FormField label="Текущий пароль">
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </FormField>
-            <FormField label="Новый пароль" error={touched.newPassword && newPasswordError ? newPasswordError : ''}>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                onBlur={() => setTouched((prev) => ({ ...prev, newPassword: true }))}
-                className={touched.newPassword && newPasswordError ? 'input-invalid' : ''}
-                minLength={6}
-                autoComplete="new-password"
-                required
-              />
-            </FormField>
-            <FormField label="Кодовая фраза подтверждения" error={touched.confirmationPhrase && phraseError ? phraseError : ''}>
-              <input
-                type="text"
-                value={confirmationPhrase}
-                onChange={(e) => setConfirmationPhrase(e.target.value)}
-                onBlur={() => setTouched((prev) => ({ ...prev, confirmationPhrase: true }))}
-                className={touched.confirmationPhrase && phraseError ? 'input-invalid' : ''}
-                required
-              />
-            </FormField>
-            <div className="form-actions">
-              <button
-                type="submit"
-                disabled={passwordSaving || Boolean(newPasswordError || phraseError)}
-              >
-                {passwordSaving ? 'Обновление...' : 'Изменить пароль'}
-              </button>
-            </div>
-          </form>
-        </section>
+        <ProfilePasswordSection
+          passwordChangePhrase={PASSWORD_CHANGE_PHRASE}
+          currentPassword={currentPassword}
+          newPassword={newPassword}
+          confirmationPhrase={confirmationPhrase}
+          newPasswordError={newPasswordError}
+          phraseError={phraseError}
+          touched={touched}
+          passwordSaving={passwordSaving}
+          onSubmit={handleChangePassword}
+          onCurrentPasswordChange={setCurrentPassword}
+          onNewPasswordChange={setNewPassword}
+          onConfirmationPhraseChange={setConfirmationPhrase}
+          onNewPasswordBlur={() => setTouched((prev) => ({ ...prev, newPassword: true }))}
+          onConfirmationPhraseBlur={() => setTouched((prev) => ({ ...prev, confirmationPhrase: true }))}
+        />
 
         {isAdmin && (
-          <section className={`card profile-section profile-admin-card ${rolesPanelOpen ? 'is-open' : ''}`}>
-            <button
-              type="button"
-              className="profile-admin-toggle"
-              aria-expanded={rolesPanelOpen}
-              aria-controls="profile-admin-roles-panel"
-              id="profile-admin-roles-heading"
-              onClick={() => setRolesPanelOpen((v) => !v)}
-            >
-              <span className="profile-section-head profile-admin-toggle-inner">
-                <span className="profile-section-icon" aria-hidden="true">◆</span>
-                <span className="profile-admin-toggle-text">
-                  <span className="profile-admin-toggle-title">Управление ролями</span>
-                  <span className="muted small profile-admin-toggle-desc">
-                    Список пользователей и поиск — после раскрытия.
-                  </span>
-                </span>
-              </span>
-              <span className={`profile-chevron ${rolesPanelOpen ? 'open' : ''}`} aria-hidden="true" />
-            </button>
-
-            {rolesPanelOpen && (
-              <div
-                id="profile-admin-roles-panel"
-                role="region"
-                aria-labelledby="profile-admin-roles-heading"
-                className="profile-admin-panel"
-              >
-                <p className="muted small profile-admin-note">
-                  Изменения ролей вступают в силу после повторного входа (новый JWT).
-                </p>
-
-                {adminUsersLoading && (
-                  <Skeleton style={{ height: 200 }} />
-                )}
-
-                {!adminUsersLoading && adminUsersError && (
-                  <div className="profile-admin-error">
-                    <p className="error">{adminUsersError}</p>
-                    <button
-                      type="button"
-                      className="secondary small"
-                      onClick={() => loadAdminUsers({ force: true })}
-                    >
-                      Повторить загрузку
-                    </button>
-                  </div>
-                )}
-
-                {!adminUsersLoading && !adminUsersError && adminUsers.length > 0 && (
-                  <>
-                    <div className="profile-admin-toolbar">
-                      <label className="profile-admin-search-label">
-                        <span className="sr-only">Поиск по имени или почте</span>
-                        <input
-                          type="search"
-                          className="profile-admin-search"
-                          placeholder="Поиск по имени или почте…"
-                          value={adminUserSearch}
-                          onChange={(e) => setAdminUserSearch(e.target.value)}
-                          autoComplete="off"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="secondary small"
-                        onClick={() => loadAdminUsers({ force: true })}
-                        disabled={adminUsersLoading}
-                      >
-                        Обновить список
-                      </button>
-                    </div>
-                    <p className="muted small profile-admin-meta">
-                      Всего в системе: <strong>{adminUsers.length}</strong>
-                      {adminUserSearch.trim() ? (
-                        <> · по запросу: <strong>{filteredAdminUsers.length}</strong></>
-                      ) : null}
-                    </p>
-
-                    {filteredAdminUsers.length === 0 ? (
-                      <p className="muted profile-admin-empty">Никто не подходит под фильтр. Измените поисковый запрос.</p>
-                    ) : (
-                      <>
-                        <div className="role-management">
-                          {paginatedAdminUsers.map((u) => (
-                            <div key={u.id} className="role-row">
-                              <div className="role-row-user">
-                                <strong>{u.username}</strong>
-                                {profile?.id === u.id && <span className="muted small"> (вы)</span>}
-                                {u.email ? (
-                                  <div className="muted small role-row-email">{u.email}</div>
-                                ) : null}
-                              </div>
-                              <select
-                                disabled={rolesSaving}
-                                value={getPrimaryRole(u.roles)}
-                                onChange={(e) => handleUpdateRoles(u.id, e.target.value)}
-                                aria-label={`Роль для ${u.username}`}
-                              >
-                                <option value="EXECUTOR">{roleLabel('EXECUTOR')}</option>
-                                <option value="MANAGER">{roleLabel('MANAGER')}</option>
-                                <option value="ADMIN">{roleLabel('ADMIN')}</option>
-                              </select>
-                            </div>
-                          ))}
-                        </div>
-
-                        {adminUsersTotalPages > 1 && (
-                          <div className="profile-admin-pagination">
-                            <button
-                              type="button"
-                              className="secondary small"
-                              disabled={adminUserPageSafe <= 1}
-                              onClick={() => setAdminUserPage((p) => Math.max(1, p - 1))}
-                            >
-                              Назад
-                            </button>
-                            <span className="muted small profile-admin-page-info">
-                              Стр. {adminUserPageSafe} из {adminUsersTotalPages}
-                              {' · '}
-                              {(adminUserPageSafe - 1) * ADMIN_USERS_PAGE_SIZE + 1}
-                              –
-                              {Math.min(adminUserPageSafe * ADMIN_USERS_PAGE_SIZE, filteredAdminUsers.length)}
-                              {' '}
-                              из {filteredAdminUsers.length}
-                            </span>
-                            <button
-                              type="button"
-                              className="secondary small"
-                              disabled={adminUserPageSafe >= adminUsersTotalPages}
-                              onClick={() => setAdminUserPage((p) => Math.min(adminUsersTotalPages, p + 1))}
-                            >
-                              Вперёд
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-
-                {!adminUsersLoading && !adminUsersError && adminUsers.length === 0 && (
-                  <p className="muted">Пользователи не найдены.</p>
-                )}
-              </div>
-            )}
-          </section>
+          <ProfileAdminRolesSection
+            rolesPanelOpen={rolesPanelOpen}
+            onTogglePanel={() => setRolesPanelOpen((v) => !v)}
+            adminUsersLoading={adminUsersLoading}
+            adminUsersError={adminUsersError}
+            adminUsers={adminUsers}
+            onRetryLoad={loadAdminUsers}
+            adminUserSearch={adminUserSearch}
+            onAdminUserSearchChange={setAdminUserSearch}
+            filteredCount={filteredAdminUsers.length}
+            paginatedUsers={paginatedAdminUsers}
+            profile={profile}
+            rolesSaving={rolesSaving}
+            onUpdateRoles={handleUpdateRoles}
+            getPrimaryRole={getPrimaryRole}
+            adminUsersTotalPages={adminUsersTotalPages}
+            adminUserPageSafe={adminUserPageSafe}
+            pageSize={ADMIN_USERS_PAGE_SIZE}
+            onPagePrev={() => setAdminUserPage((p) => Math.max(1, p - 1))}
+            onPageNext={() => setAdminUserPage((p) => Math.min(adminUsersTotalPages, p + 1))}
+          />
         )}
       </div>
     </Layout>

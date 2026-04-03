@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +36,50 @@ public class TaskService {
                 "TASK_CREATED",
                 "Задача создана",
                 "Вы создали задачу: \"" + task.getTitle() + "\""
+        );
+    }
+
+    /**
+     * Участники, которым важно знать об удалении (не инициатор удаления).
+     */
+    public void notifyTaskDeleted(Task task, Long deletedBy) {
+        if (task == null || deletedBy == null) return;
+        String title = task.getTitle() != null ? task.getTitle() : "";
+        Set<Long> done = new HashSet<>();
+        Long assigneeId = task.getAssigneeId();
+        if (assigneeId != null && !assigneeId.equals(deletedBy)) {
+            notificationClient.createNotification(
+                    assigneeId,
+                    "TASK_DELETED",
+                    "Задача удалена",
+                    "Задача \"" + title + "\" была удалена"
+            );
+            done.add(assigneeId);
+        }
+        Long createdBy = task.getCreatedBy();
+        if (createdBy != null && !createdBy.equals(deletedBy) && !done.contains(createdBy)) {
+            notificationClient.createNotification(
+                    createdBy,
+                    "TASK_DELETED",
+                    "Задача удалена",
+                    "Задача \"" + title + "\" была удалена"
+            );
+        }
+    }
+
+    /** Автор комментария узнаёт, если его комментарий удалил другой пользователь. */
+    public void notifyCommentDeletedByOther(Long commentAuthorId, Long deletedBy, String taskTitle, String commentText) {
+        if (commentAuthorId == null || deletedBy == null || commentAuthorId.equals(deletedBy)) return;
+        String t = taskTitle != null ? taskTitle : "";
+        String excerpt = commentText != null ? commentText.trim() : "";
+        if (excerpt.length() > 200) {
+            excerpt = excerpt.substring(0, 197) + "...";
+        }
+        notificationClient.createNotification(
+                commentAuthorId,
+                "COMMENT_DELETED",
+                "Комментарий удалён",
+                "К задаче \"" + t + "\". Фрагмент: \"" + excerpt + "\""
         );
     }
 

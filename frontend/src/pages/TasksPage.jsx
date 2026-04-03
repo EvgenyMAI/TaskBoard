@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
-import Skeleton from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import {
   getTasks,
@@ -11,21 +10,10 @@ import {
   createTask,
   getProjectMembers,
 } from '../api';
-
-const STATUS_LABELS = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'На проверке',
-  DONE: 'Выполнена',
-  CANCELLED: 'Отменена',
-};
-
-function formatDueDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('ru-RU');
-}
+import TasksPageHeader from '../components/tasks/TasksPageHeader';
+import TasksFiltersSection from '../components/tasks/TasksFiltersSection';
+import TasksCreateFormSection from '../components/tasks/TasksCreateFormSection';
+import TasksListSection from '../components/tasks/TasksListSection';
 
 export default function TasksPage() {
   const [searchParams] = useSearchParams();
@@ -150,219 +138,62 @@ export default function TasksPage() {
   return (
     <Layout>
       <div className="container page-width tasks-page">
-        <header className="card profile-hero tasks-hero">
-          <div className="profile-hero-main">
-            <div className="profile-avatar profile-avatar-tasks" aria-hidden="true">{heroLetter}</div>
-            <div className="profile-hero-text">
-              <h1>Задачи</h1>
-              <div className="profile-hero-line">
-                <p className="profile-hero-sub">
-                  {username ? `Все ваши задачи, ${username}` : 'Отфильтруйте по проекту, статусу или исполнителю'}
-                </p>
-                <div className="profile-role-chips" aria-live="polite">
-                  <span className="profile-chip-metric">
-                    {loading ? 'Загрузка…' : `Задач: ${tasks.length}`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="profile-hero-hint profile-hero-hint-row">
-            <p className="muted small profile-hero-hint-text">
-              В карточке задачи — комментарии, файлы и история изменений.
-            </p>
-            <button type="button" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'Отмена' : '+ Создать задачу'}
-            </button>
-          </div>
-        </header>
+        <TasksPageHeader
+          heroLetter={heroLetter}
+          username={username}
+          loading={loading}
+          tasksCount={tasks.length}
+          showCreate={showCreate}
+          onToggleCreate={() => setShowCreate(!showCreate)}
+        />
 
         {error && <p className="error tasks-global-error">{error}</p>}
 
-        <section className="card profile-section" aria-labelledby="tasks-filters-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="tasks-filters-heading">Фильтры</h2>
-          </div>
-          <div className="form-row tasks-filters-row">
-            <div className="form-group">
-              <label htmlFor="task-filter-project">Проект</label>
-              <select
-                id="task-filter-project"
-                value={filterProjectId}
-                onChange={(e) => setFilterProjectId(e.target.value)}
-              >
-                <option value="">Все проекты</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="task-filter-status">Статус</label>
-              <select
-                id="task-filter-status"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="">Любой</option>
-                {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label htmlFor="task-filter-assignee">Исполнитель</label>
-              <select
-                id="task-filter-assignee"
-                value={filterAssigneeId}
-                onChange={(e) => setFilterAssigneeId(e.target.value)}
-              >
-                <option value="">Все</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.username}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </section>
+        <TasksFiltersSection
+          filterProjectId={filterProjectId}
+          setFilterProjectId={setFilterProjectId}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          filterAssigneeId={filterAssigneeId}
+          setFilterAssigneeId={setFilterAssigneeId}
+          projects={projects}
+          users={users}
+        />
 
-        {showCreate && (
-          <section className="card profile-section" aria-labelledby="tasks-new-heading">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="tasks-new-heading">Новая задача</h2>
-            </div>
-            <form onSubmit={handleCreateTask}>
-              <div className="form-group">
-                <label htmlFor="task-new-project">Проект *</label>
-                <select
-                  id="task-new-project"
-                  value={formProjectId}
-                  onChange={(e) => setFormProjectId(e.target.value)}
-                  onBlur={() => setTouched((prev) => ({ ...prev, projectId: true }))}
-                  className={touched.projectId && projectError ? 'input-invalid' : ''}
-                  required
-                >
-                  <option value="">— выберите проект —</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                {touched.projectId && projectError && <p className="field-error">{projectError}</p>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="task-new-title">Название</label>
-                <input
-                  id="task-new-title"
-                  type="text"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  onBlur={() => setTouched((prev) => ({ ...prev, title: true }))}
-                  className={touched.title && titleError ? 'input-invalid' : ''}
-                  required
-                />
-                {touched.title && titleError && <p className="field-error">{titleError}</p>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="task-new-desc">Описание</label>
-                <textarea
-                  id="task-new-desc"
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  rows={2}
-                />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Статус</label>
-                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value)}>
-                    {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Исполнитель</label>
-                  {isExecutor ? (
-                    <select value={formAssigneeId} disabled>
-                      <option value={user?.userId}>
-                        {user?.username || `#${user?.userId}`}
-                      </option>
-                    </select>
-                  ) : (
-                    <select value={formAssigneeId} onChange={(e) => setFormAssigneeId(e.target.value)}>
-                      <option value="">— не назначен —</option>
-                      {membersForProject
-                        .map((uid) => users.find((u) => u.id === uid))
-                        .filter(Boolean)
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>{u.username}</option>
-                        ))}
-                    </select>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Срок</label>
-                  <input
-                    type="datetime-local"
-                    value={formDueDate}
-                    onChange={(e) => setFormDueDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="form-actions">
-                <button type="button" className="secondary" onClick={() => setShowCreate(false)}>
-                  Отмена
-                </button>
-                <button type="submit" disabled={submitLoading || Boolean(projectError || titleError)}>
-                  {submitLoading ? 'Создание...' : 'Создать'}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
+        <TasksCreateFormSection
+          showCreate={showCreate}
+          formProjectId={formProjectId}
+          setFormProjectId={setFormProjectId}
+          formTitle={formTitle}
+          setFormTitle={setFormTitle}
+          formDescription={formDescription}
+          setFormDescription={setFormDescription}
+          formStatus={formStatus}
+          setFormStatus={setFormStatus}
+          formAssigneeId={formAssigneeId}
+          setFormAssigneeId={setFormAssigneeId}
+          formDueDate={formDueDate}
+          setFormDueDate={setFormDueDate}
+          touched={touched}
+          setTouched={setTouched}
+          projectError={projectError}
+          titleError={titleError}
+          projects={projects}
+          membersForProject={membersForProject}
+          users={users}
+          isExecutor={isExecutor}
+          user={user}
+          submitLoading={submitLoading}
+          onSubmit={handleCreateTask}
+          onCancel={() => setShowCreate(false)}
+        />
 
-        <section className="card profile-section" aria-labelledby="tasks-list-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="tasks-list-heading">Список задач</h2>
-          </div>
-          {loading ? (
-            <ul className="task-list">
-              <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
-              <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
-              <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
-            </ul>
-          ) : tasks.length === 0 ? (
-            <p className="muted tasks-empty">Нет задач по выбранным фильтрам.</p>
-          ) : (
-            <ul className="task-list">
-              {tasks.map((t) => (
-                <li key={t.id} className="card task-list-item">
-                  <div className="task-item-content">
-                    <div className="task-item-header">
-                      <Link to={`/tasks/${t.id}`} className="task-title">
-                        {t.title}
-                      </Link>
-                      <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
-                        {STATUS_LABELS[t.status] || t.status}
-                      </span>
-                    </div>
-                    <div className="task-item-meta">
-                      <span className="meta-chip">Проект: {t.projectId ? projectById(t.projectId) : '—'}</span>
-                      <span className="meta-chip">Исполнитель: {t.assigneeId ? userById(t.assigneeId) : '—'}</span>
-                      <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
-                    </div>
-                  </div>
-                  <Link to={`/tasks/${t.id}`} className="btn-link">
-                    Открыть →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <TasksListSection
+          loading={loading}
+          tasks={tasks}
+          projectById={projectById}
+          userById={userById}
+        />
       </div>
     </Layout>
   );
