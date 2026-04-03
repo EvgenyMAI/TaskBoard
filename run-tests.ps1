@@ -20,6 +20,8 @@ function NewRunLogDir() {
 }
 
 $script:runLogDir = NewRunLogDir
+$script:vitestRan = $false
+$script:e2eRan = $false
 
 function Info($msg) {
   Write-Host ("`n==> " + $msg) -ForegroundColor Cyan
@@ -269,6 +271,21 @@ function PrintBackendKpi() {
   Write-Host ("maven cache: {0}" -f $script:mavenCacheDir)
 }
 
+function Print-OverallSummary() {
+  Info "Run summary (this run)"
+  if ($script:backendResults.Count -gt 0) {
+    $testsSum = [math]::Round((($script:backendResults | Measure-Object -Property ResultsTestSum -Sum).Sum), 0)
+    Write-Host ("  Backend (Maven / Surefire): {0} tests, {1} Maven run(s)" -f $testsSum, $script:backendResults.Count)
+  }
+  if ($script:vitestRan) {
+    Write-Host "  Frontend unit (Vitest): passed"
+  }
+  if ($script:e2eRan) {
+    Write-Host "  E2E (Playwright): passed"
+  }
+  Write-Host ("  Log directory: {0}" -f $script:runLogDir)
+}
+
 function NeedsAsciiPath([string]$path) {
   foreach ($ch in $path.ToCharArray()) {
     if ([int][char]$ch -gt 127) { return $true }
@@ -328,9 +345,11 @@ if ($BackendOnly) {
 
 if (-not $E2EOnly) {
   Info "Frontend unit tests (Vitest)"
+  $script:vitestRan = $true
   Push-Location (Join-Path $workRoot "frontend")
   try {
-    Run "npm install"
+    # --no-audit --no-fund: less noise; run npm audit manually when needed
+    Run "npm install --no-audit --no-fund"
     Run "npm run test"
   } finally {
     Pop-Location
@@ -342,6 +361,7 @@ if (-not $E2EOnly) {
 }
 
 if (-not $BackendOnly) {
+  $script:e2eRan = $true
   # Bring up backend stack needed for e2e
   Push-Location $workRoot
   $savedComposePorts = @{}
@@ -401,7 +421,7 @@ if (-not $BackendOnly) {
 
     Push-Location "frontend"
     try {
-      Run "npm install"
+      Run "npm install --no-audit --no-fund"
       Run "npx playwright install --with-deps chromium"
 
       # Use build+preview for stable e2e (same host ports as compose file for this run)
@@ -470,5 +490,6 @@ if (-not $BackendOnly) {
   }
 }
 
+Print-OverallSummary
 Info "All tests completed successfully."
 
