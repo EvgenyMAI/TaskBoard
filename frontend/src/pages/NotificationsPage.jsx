@@ -28,6 +28,8 @@ const TYPE_LABELS = {
   TASK_ASSIGNED: 'Назначение',
   TASK_REASSIGNED: 'Переназначение',
   TASK_STATUS_CHANGED: 'Смена статуса',
+  TASK_DELETED: 'Удаление задачи',
+  COMMENT_DELETED: 'Комментарий',
 };
 
 function taskTitleFromBody(body) {
@@ -229,6 +231,8 @@ export default function NotificationsPage() {
                 <option value="TASK_ASSIGNED">Назначение</option>
                 <option value="TASK_REASSIGNED">Переназначение</option>
                 <option value="TASK_STATUS_CHANGED">Смена статуса</option>
+                <option value="TASK_DELETED">Удаление задачи</option>
+                <option value="COMMENT_DELETED">Комментарий удалён</option>
               </select>
             </div>
             <div className="form-group notifications-filter-search">

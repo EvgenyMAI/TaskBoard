@@ -385,12 +385,15 @@ LOG_LEVEL=INFO
 
 # Полный Maven-лог в консоль
 .\run-tests.ps1 -VerboseBackendLogs
+
+# Backend на хосте (JDK 17 и mvn в PATH; кэш артефактов — .cache/m2/repository)
+.\run-tests.ps1 -BackendOnly -UseHostMaven
 ```
 
 Скрипт:
 
-- гоняет **auth-service** отдельно и **reactor** `tasks-service` / `analytics-service` с модулем **`taskboard-common`**;
-- для backend проверяет **код выхода Docker/Maven**, наличие **`BUILD FAILURE`** в логе и **сумму тестов** по блокам Surefire `[INFO] Results:` (чтобы не пропустить «тихий» сбой);
+- гоняет **auth-service** отдельно и **один** прогон Maven по reactor: **`tasks-service` + `analytics-service`** с модулем **`taskboard-common`** (как в CI);
+- для backend проверяет **код выхода Maven** (в Docker или на хосте с **`-UseHostMaven`**), наличие **`BUILD FAILURE`** в логе и **сумму тестов** по блокам Surefire `[INFO] Results:` (чтобы не пропустить «тихий» сбой);
 - для e2e поднимает изолированный стек, подставляет `VITE_*` под выбранные порты, затем выполняет **`docker compose down -v`**;
 - логи: **`logs/test-runs/<timestamp>/`**.
 

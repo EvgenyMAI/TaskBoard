@@ -69,6 +69,7 @@ jobs:
           E2E_BASE_URL: http://localhost:3000
           E2E_AUTH_API: http://localhost:8081/api/auth
           E2E_TASKS_API: http://localhost:8082/api
+          E2E_ANALYTICS_API: http://localhost:8083/api
         run: npm run test:e2e
 
       - name: Upload frontend log on failure

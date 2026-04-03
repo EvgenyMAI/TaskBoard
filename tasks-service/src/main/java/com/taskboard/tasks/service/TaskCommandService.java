@@ -104,15 +104,12 @@ public class TaskCommandService {
     public ResponseEntity<Void> delete(Long id, Authentication auth) {
         Long userId = RoleAuthorization.userId(auth);
         boolean isExecutor = RoleAuthorization.isExecutor(auth);
-        if (!taskRepository.existsById(id)) {
+        Task task = taskRepository.findByIdWithProject(id).orElse(null);
+        if (task == null) {
             return ResponseEntity.notFound().build();
         }
 
         if (isExecutor) {
-            Task task = taskRepository.findById(id).orElse(null);
-            if (task == null) {
-                return ResponseEntity.notFound().build();
-            }
             boolean allowed = (task.getAssigneeId() != null && task.getAssigneeId().equals(userId))
                     || (task.getCreatedBy() != null && task.getCreatedBy().equals(userId));
             if (!allowed) {
@@ -120,6 +117,7 @@ public class TaskCommandService {
             }
         }
 
+        taskService.notifyTaskDeleted(task, userId);
         taskRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

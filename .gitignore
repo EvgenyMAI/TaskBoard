@@ -21,6 +21,7 @@ build/
 *.log
 logs/
 playwright-report/
+frontend/tests-e2e/.auth/
 test-results/
 
 # OS

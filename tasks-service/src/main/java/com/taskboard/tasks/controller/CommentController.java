@@ -1,9 +1,11 @@
 package com.taskboard.tasks.controller;
 
 import com.taskboard.tasks.entity.Comment;
+import com.taskboard.tasks.entity.Task;
 import com.taskboard.tasks.repository.CommentRepository;
 import com.taskboard.tasks.repository.ProjectMemberRepository;
 import com.taskboard.tasks.repository.TaskRepository;
+import com.taskboard.tasks.service.TaskService;
 import com.taskboard.tasks.security.RoleAuthorization;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/tasks/{taskId}/comments")
@@ -26,6 +29,7 @@ public class CommentController {
     private final CommentRepository commentRepository;
     private final TaskRepository taskRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final TaskService taskService;
 
     @GetMapping
     public ResponseEntity<List<Comment>> list(@PathVariable Long taskId, Authentication auth) {
@@ -78,16 +82,22 @@ public class CommentController {
         Comment comment = commentRepository.findById(id).orElse(null);
         if (comment == null) return ResponseEntity.notFound().build();
 
+        Long commentTaskId = comment.getTask() != null ? comment.getTask().getId() : null;
+        if (!Objects.equals(commentTaskId, taskId)) {
+            return ResponseEntity.notFound().build();
+        }
+
         if (isExecutor) {
             // Для безопасности EXECUTOR может удалять только свои комментарии.
             if (comment.getAuthorId() == null || !comment.getAuthorId().equals(userId)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-            if (comment.getTask() != null && comment.getTask().getId() != null && !comment.getTask().getId().equals(taskId)) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-            }
         }
 
+        Task task = taskRepository.findById(taskId).orElse(null);
+        if (task == null) return ResponseEntity.notFound().build();
+
+        taskService.notifyCommentDeletedByOther(comment.getAuthorId(), userId, task.getTitle(), comment.getText());
         commentRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
