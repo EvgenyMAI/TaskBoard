@@ -6,10 +6,9 @@ import com.taskboard.tasks.repository.ProjectMemberRepository;
 import com.taskboard.tasks.repository.ProjectRepository;
 import com.taskboard.tasks.repository.TaskRepository;
 import com.taskboard.tasks.service.TaskService;
+import com.taskboard.tasks.service.TaskQueryService;
 import com.taskboard.tasks.security.RoleAuthorization;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -21,8 +20,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -34,6 +31,7 @@ public class TaskController {
     private final ProjectRepository projectRepository;
     private final TaskService taskService;
     private final ProjectMemberRepository projectMemberRepository;
+    private final TaskQueryService taskQueryService;
 
     @GetMapping
     public ResponseEntity<?> list(
@@ -44,56 +42,12 @@ public class TaskController {
             @RequestParam(defaultValue = "20") int size,
             Authentication auth
     ) {
-        Long userId = RoleAuthorization.userId(auth);
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-        var pageable = PageRequest.of(page, size);
-
-        if (isExecutor) {
-            List<Long> allowedProjectIds = projectMemberRepository.findProjectIdsByUserId(userId);
-            if (allowedProjectIds == null || allowedProjectIds.isEmpty()) {
-                return ResponseEntity.ok(Page.empty(pageable));
-            }
-
-            // Внутри доступных проектов EXECUTOR видит задачи всех пользователей.
-            if (projectId != null) {
-                if (!allowedProjectIds.contains(projectId)) {
-                    return ResponseEntity.ok(Page.empty(pageable));
-                }
-                Page<Task> result = taskRepository.findByProjectAndFilters(projectId, status, assigneeId, pageable);
-                return ResponseEntity.ok(result);
-            }
-
-            // Если фильтр по проекту не выбран — показываем задачи во всех проектах, где есть назначенные ему задачи.
-            Page<Task> result = taskRepository.findByProjectIdsAndFilters(allowedProjectIds, status, assigneeId, pageable);
-            return ResponseEntity.ok(result);
-        }
-
-        if (projectId != null) {
-            Page<Task> result = taskRepository.findByProjectAndFilters(projectId, status, assigneeId, pageable);
-            return ResponseEntity.ok(result);
-        }
-        if (assigneeId != null) {
-            return ResponseEntity.ok(taskRepository.findByAssigneeId(assigneeId));
-        }
-        return ResponseEntity.ok(taskRepository.findAll(pageable));
+        return taskQueryService.listTasks(projectId, status, assigneeId, page, size, auth);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Task> get(@PathVariable Long id, Authentication auth) {
-        Long userId = RoleAuthorization.userId(auth);
-        boolean isExecutor = RoleAuthorization.isExecutor(auth);
-
-        return taskRepository.findByIdWithProject(id)
-                .map(task -> {
-                    if (isExecutor) {
-                        Long taskProjectId = task.getProjectId();
-                        if (taskProjectId == null || !projectMemberRepository.existsByIdProjectIdAndIdUserId(taskProjectId, userId)) {
-                            return ResponseEntity.status(HttpStatus.NOT_FOUND).<Task>build();
-                        }
-                    }
-                    return ResponseEntity.ok(task);
-                })
-                .orElse(ResponseEntity.notFound().build());
+        return taskQueryService.getTask(id, auth);
     }
 
     @PostMapping
@@ -111,7 +65,6 @@ public class TaskController {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Вы не состоите в этом проекте");
             }
         } else {
-            // Для ADMIN/MANAGER: назначать задачу можно только участнику проекта.
             if (dto.getAssigneeId() != null) {
                 boolean assigneeIsMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(project.getId(), dto.getAssigneeId());
                 if (!assigneeIsMember) {
@@ -147,14 +100,11 @@ public class TaskController {
         if (existing == null) return ResponseEntity.notFound().build();
 
         if (isExecutor) {
-            // EXECUTOR может обновлять только задачи, назначенные ему.
             if (existing.getAssigneeId() == null || !existing.getAssigneeId().equals(userId)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Редактировать можно только задачи, назначенные на вас");
             }
-            // EXECUTOR не может пере назначать задачу на другого пользователя.
             dto.setAssigneeId(existing.getAssigneeId());
         } else {
-            // ADMIN/MANAGER: исполнитель должен быть участником проекта задачи (как при создании).
             if (dto.getAssigneeId() != null) {
                 Long projectId = existing.getProjectId();
                 if (projectId == null) {
@@ -185,7 +135,6 @@ public class TaskController {
         boolean isExecutor = RoleAuthorization.isExecutor(auth);
         if (!taskRepository.existsById(id)) return ResponseEntity.notFound().build();
 
-        // EXECUTOR может удалить только задачи, назначенные ему или им созданные.
         if (isExecutor) {
             Task task = taskRepository.findById(id).orElse(null);
             if (task == null) return ResponseEntity.notFound().build();

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import Modal from '../components/Modal';
 import Skeleton from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -26,14 +25,11 @@ import { STATUS_LABELS } from '../constants/taskStatus';
 import { HISTORY_FIELD_LABELS } from '../constants/taskHistoryFields';
 import { formatDateTimeRu } from '../utils/dateFormat';
 import { formatTaskHistoryFieldValue } from '../utils/taskHistoryFormat';
-import {
-  isImageMime,
-  isPreviewableMime,
-  isTextPreviewableMime,
-  attachmentFileKind,
-  formatFileSizeBytes,
-} from '../utils/attachmentKind';
-import AttachmentFileTypeIcon from '../components/task-detail/AttachmentFileTypeIcon';
+import { isImageMime, isPreviewableMime, isTextPreviewableMime } from '../utils/attachmentKind';
+import TaskCommentsPanel from '../components/task-detail/TaskCommentsPanel';
+import TaskAttachmentsPanel from '../components/task-detail/TaskAttachmentsPanel';
+import TaskHistoryPanel from '../components/task-detail/TaskHistoryPanel';
+import TaskAttachmentViewerModal, { EMPTY_VIEWER } from '../components/task-detail/TaskAttachmentViewerModal';
 
 export default function TaskDetailPage() {
   const { id } = useParams();
@@ -61,7 +57,7 @@ export default function TaskDetailPage() {
   const [attachFile, setAttachFile] = useState(null);
   const [attachLoading, setAttachLoading] = useState(false);
   const [attachmentThumbs, setAttachmentThumbs] = useState({});
-  const [viewer, setViewer] = useState({ open: false, url: '', name: '', mime: '', mode: 'file', text: '' });
+  const [viewer, setViewer] = useState(EMPTY_VIEWER);
   const [activeTab, setActiveTab] = useState('comments'); // comments | attachments | history
   const [projectMemberIds, setProjectMemberIds] = useState([]);
 
@@ -609,221 +605,49 @@ export default function TaskDetailPage() {
         </div>
 
         {activeTab === 'comments' && (
-          <section className="card profile-section task-detail-tab-panel" aria-labelledby="task-comments-heading" role="tabpanel">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="task-comments-heading">Комментарии</h2>
-            </div>
-            <div className="task-panel-inner">
-              <div className="task-comments-composer">
-                <h3 className="task-subsection-title">Новый комментарий</h3>
-                <form onSubmit={handleAddComment} className="task-comment-form">
-                  <label htmlFor="task-new-comment" className="sr-only">Текст комментария</label>
-                  <textarea
-                    id="task-new-comment"
-                    className="task-comment-textarea"
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Напишите комментарий к задаче…"
-                    rows={3}
-                  />
-                  <div className="task-comment-form-footer">
-                    <button type="submit" disabled={commentLoading || !newComment.trim()}>
-                      {commentLoading ? 'Отправка…' : 'Отправить'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-              <div className="task-comments-list-wrap">
-                <h3 className="task-subsection-title task-subsection-title-spaced">Лента</h3>
-                {comments.length === 0 ? (
-                  <p className="muted task-panel-empty">Комментариев пока нет.</p>
-                ) : (
-                  <ul className="task-comment-cards">
-                    {comments.map((c) => {
-                      const un = userName(c.authorId);
-                      const initial = (un && un.charAt(0) !== '#') ? un.charAt(0).toUpperCase() : '?';
-                      return (
-                        <li key={c.id} className="task-comment-card">
-                          <div className="task-comment-card-top">
-                            <span className="task-comment-avatar" aria-hidden="true">{initial}</span>
-                            <div className="task-comment-card-meta">
-                              <span className="task-comment-author">{un}</span>
-                              <time className="muted small task-comment-time" dateTime={c.createdAt}>
-                                {formatDateTimeRu(c.createdAt)}
-                              </time>
-                            </div>
-                            {(isAdminOrManager || c.authorId === currentUserId) && (
-                              <button
-                                type="button"
-                                className="small danger task-comment-delete"
-                                onClick={() => handleDeleteComment(c.id)}
-                              >
-                                Удалить
-                              </button>
-                            )}
-                          </div>
-                          <p className="task-comment-body">{c.text}</p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </section>
+          <TaskCommentsPanel
+            comments={comments}
+            newComment={newComment}
+            onNewCommentChange={setNewComment}
+            commentLoading={commentLoading}
+            onSubmitComment={handleAddComment}
+            onDeleteComment={handleDeleteComment}
+            userName={userName}
+            isAdminOrManager={isAdminOrManager}
+            currentUserId={currentUserId}
+            formatDateTimeRu={formatDateTimeRu}
+          />
         )}
 
         {activeTab === 'attachments' && (
-          <section className="card profile-section task-detail-tab-panel" aria-labelledby="task-attachments-heading" role="tabpanel">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="task-attachments-heading">Вложения</h2>
-            </div>
-            <div className="task-panel-inner">
-              <div className="task-attachment-upload-block">
-                <h3 className="task-subsection-title">Загрузить файл</h3>
-                {canUploadAttachment ? (
-                  <>
-                    <p className="muted small task-attachment-hint">
-                      Изображения, PDF, документы и др. Максимум 25 МБ на файл.
-                    </p>
-                    <form onSubmit={handleUploadAttachment} className="task-attachment-upload-form">
-                      <input
-                        type="file"
-                        className="task-attachment-file-input"
-                        onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
-                        aria-label="Выбор файла"
-                      />
-                      <button type="submit" disabled={attachLoading || !attachFile}>
-                        {attachLoading ? 'Загрузка…' : 'Загрузить'}
-                      </button>
-                    </form>
-                  </>
-                ) : (
-                  <p className="muted small">Нет прав на загрузку вложений для этой задачи.</p>
-                )}
-              </div>
-              <div className="task-attachments-grid-wrap">
-                <h3 className="task-subsection-title task-subsection-title-spaced">Файлы</h3>
-                {attachments.length === 0 ? (
-                  <p className="muted task-panel-empty">Вложений пока нет.</p>
-                ) : (
-                  <ul className="task-attachment-grid">
-                    {attachments.map((a) => (
-                      <li key={a.id} className="task-attachment-card">
-                        <div className="task-attachment-card-main">
-                          <div className="task-attachment-card-title-row">
-                            <AttachmentFileTypeIcon type={attachmentFileKind(a.fileName, a.mimeType)} />
-                            <strong className="task-attachment-name">{displayName(a)}</strong>
-                          </div>
-                          <p className="muted small task-attachment-meta-line">
-                            {a.mimeType || 'application/octet-stream'} · {formatFileSizeBytes(a.fileSize)}
-                          </p>
-                          <div className="task-attachment-actions">
-                            {isPreviewableMime(a.mimeType) && (
-                              <button type="button" className="secondary small" onClick={() => handleOpenAttachment(a)}>
-                                Открыть
-                              </button>
-                            )}
-                            <button type="button" className="secondary small" onClick={() => handleDownloadAttachment(a)}>
-                              Скачать
-                            </button>
-                            {(isAdminOrManager || a.uploadedBy === currentUserId) && (
-                              <button type="button" className="small danger" onClick={() => handleDeleteAttachment(a.id)}>
-                                Удалить
-                              </button>
-                            )}
-                          </div>
-                          {isImageMime(a.mimeType) && (
-                            <div className="task-attachment-thumb-wrap">
-                              {attachmentThumbs[a.id] ? (
-                                <button
-                                  type="button"
-                                  className="task-attachment-thumb-btn"
-                                  onClick={() => handleOpenAttachment(a)}
-                                  aria-label={`Открыть превью: ${displayName(a)}`}
-                                >
-                                  <img
-                                    src={attachmentThumbs[a.id]}
-                                    alt=""
-                                    className="task-attachment-thumb-img"
-                                  />
-                                </button>
-                              ) : (
-                                <span className="muted small">Превью загружается…</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </section>
+          <TaskAttachmentsPanel
+            attachments={attachments}
+            attachFile={attachFile}
+            onAttachFileChange={setAttachFile}
+            attachLoading={attachLoading}
+            canUploadAttachment={canUploadAttachment}
+            isAdminOrManager={isAdminOrManager}
+            currentUserId={currentUserId}
+            attachmentThumbs={attachmentThumbs}
+            onUploadSubmit={handleUploadAttachment}
+            onOpenAttachment={handleOpenAttachment}
+            onDownloadAttachment={handleDownloadAttachment}
+            onDeleteAttachment={handleDeleteAttachment}
+            displayName={displayName}
+          />
         )}
 
         {activeTab === 'history' && (
-          <section className="card profile-section task-detail-tab-panel" aria-labelledby="task-history-heading" role="tabpanel">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="task-history-heading">История изменений</h2>
-            </div>
-            <div className="task-panel-inner">
-              <p className="muted small task-history-intro">
-                Хронология правок полей задачи. Новые записи сверху.
-              </p>
-              {history.length === 0 ? (
-                <p className="muted task-panel-empty">Изменений пока не было.</p>
-              ) : (
-                <ul className="task-history-list">
-                  {history.map((h) => (
-                    <li key={h.id} className="task-history-card">
-                      <div className="task-history-card-head">
-                        <span className="task-history-field-chip">{historyFieldTitle(h.fieldName)}</span>
-                        <span className="muted small task-history-when">
-                          {userName(h.changedBy)} · {formatDateTimeRu(h.changedAt)}
-                        </span>
-                      </div>
-                      <div className="task-history-diff" aria-label="Было и стало">
-                        <div className="task-history-col task-history-col-old">
-                          <span className="task-history-col-label">Было</span>
-                          <span className="task-history-value">{formatHistoryValue(h.fieldName, h.oldValue)}</span>
-                        </div>
-                        <span className="task-history-arrow" aria-hidden="true">→</span>
-                        <div className="task-history-col task-history-col-new">
-                          <span className="task-history-col-label">Стало</span>
-                          <span className="task-history-value">{formatHistoryValue(h.fieldName, h.newValue)}</span>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </section>
+          <TaskHistoryPanel
+            history={history}
+            historyFieldTitle={historyFieldTitle}
+            formatHistoryValue={formatHistoryValue}
+            formatDateTimeRu={formatDateTimeRu}
+            userName={userName}
+          />
         )}
       </div>
-      {viewer.open && (
-        <Modal title={viewer.name} onClose={() => setViewer({ open: false, url: '', name: '', mime: '', mode: 'file', text: '' })} width="96vw">
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            {viewer.mode === 'image' ? (
-              <img src={viewer.url} alt={viewer.name} style={{ maxWidth: '100%', maxHeight: '85vh' }} />
-            ) : (
-              <pre style={{ width: '100%', maxHeight: '85vh', overflow: 'auto', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                {viewer.text}
-              </pre>
-            )}
-          </div>
-          <div className="form-actions" style={{ marginTop: '1rem' }}>
-            <button type="button" className="secondary" onClick={() => setViewer({ open: false, url: '', name: '', mime: '', mode: 'file', text: '' })}>
-              Закрыть
-            </button>
-          </div>
-        </Modal>
-      )}
+      <TaskAttachmentViewerModal viewer={viewer} onClose={() => setViewer(EMPTY_VIEWER)} />
     </Layout>
   );
 }

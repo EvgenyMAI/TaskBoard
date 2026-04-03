@@ -1,30 +1,22 @@
 package com.taskboard.analytics.controller;
 
 import com.taskboard.analytics.dto.NotificationDto;
-import com.taskboard.analytics.entity.NotificationEntity;
-import com.taskboard.analytics.repository.NotificationRepository;
+import com.taskboard.analytics.service.NotificationApplicationService;
+import com.taskboard.analytics.service.NotificationSseRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Notifications API — persisted in PostgreSQL.
+ * Notifications API — persisted in PostgreSQL; realtime через SSE.
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -32,8 +24,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @RequiredArgsConstructor
 public class NotificationController {
 
-    private final NotificationRepository notificationRepository;
-    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<SseEmitter>> emittersByUser = new ConcurrentHashMap<>();
+    private final NotificationApplicationService notificationApplicationService;
+    private final NotificationSseRegistry notificationSseRegistry;
 
     @Value("${app.notifications.internal-key:taskboard-internal-key}")
     private String internalKey;
@@ -47,74 +39,31 @@ public class NotificationController {
                                                       @RequestParam(required = false) String q,
                                                       @RequestParam(defaultValue = "100") int limit) {
         Long userId = (Long) auth.getPrincipal();
-        int safeLimit = Math.max(1, Math.min(limit, 500));
-        String normalizedType = type != null && !type.isBlank()
-                ? type.trim().toUpperCase(Locale.ROOT)
-                : null;
-        String normalizedQ = q != null && !q.isBlank() ? q.trim() : null;
-
-        List<NotificationDto> result = notificationRepository.findAll(
-                        buildSpec(userId, read, normalizedType, from, to, normalizedQ),
-                        PageRequest.of(0, safeLimit, Sort.by(Sort.Direction.DESC, "createdAt")))
-                .stream()
-                .map(this::toDto)
-                .toList();
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(notificationApplicationService.listForUser(userId, read, type, from, to, q, limit));
     }
 
     @GetMapping("/unread")
     public ResponseEntity<Long> unreadCount(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        long count = notificationRepository.countByUserIdAndReadFalse(userId);
-        return ResponseEntity.ok(count);
+        return ResponseEntity.ok(notificationApplicationService.unreadCount(userId));
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-
-        SseEmitter emitter = new SseEmitter(0L); // no timeout
-        emittersByUser.computeIfAbsent(userId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
-
-        emitter.onCompletion(() -> removeEmitter(userId, emitter));
-        emitter.onTimeout(() -> emitter.complete());
-        emitter.onError((ex) -> removeEmitter(userId, emitter));
-
-        try {
-            emitter.send(SseEmitter.event().name("connected").data("ok"));
-        } catch (IOException ignored) {
-            removeEmitter(userId, emitter);
-        }
-
-        return emitter;
+        return notificationSseRegistry.subscribe(userId);
     }
 
     @PatchMapping("/{id}/read")
     public ResponseEntity<NotificationDto> markAsRead(@PathVariable Long id, Authentication auth) {
         Long userId = (Long) auth.getPrincipal();
-        return notificationRepository.findByIdAndUserId(id, userId)
-                .map(entity -> {
-                    entity.setRead(true);
-                    NotificationEntity saved = notificationRepository.save(entity);
-                    return ResponseEntity.ok(toDto(saved));
-                })
-                .orElse(ResponseEntity.notFound().build());
+        return notificationApplicationService.markAsRead(id, userId);
     }
 
-    /**
-     * Internal API: создание уведомления (вызывается tasks-service при назначении/изменении задачи).
-     */
     @PostMapping
     public ResponseEntity<NotificationDto> create(Authentication auth, @RequestBody NotificationDto dto) {
         Long userId = (Long) auth.getPrincipal();
-        NotificationDto safeDto = NotificationDto.builder()
-                .userId(userId)
-                .type(dto.getType())
-                .title(dto.getTitle())
-                .body(dto.getBody())
-                .read(false)
-                .build();
-        return createInternal(safeDto);
+        return notificationApplicationService.createForAuthenticatedUser(userId, dto);
     }
 
     @PostMapping("/internal")
@@ -123,88 +72,6 @@ public class NotificationController {
         if (headerKey == null || !headerKey.equals(internalKey)) {
             return ResponseEntity.status(401).build();
         }
-        return createInternal(dto);
-    }
-
-    private ResponseEntity<NotificationDto> createInternal(NotificationDto dto) {
-        NotificationEntity entity = NotificationEntity.builder()
-                .userId(dto.getUserId())
-                .type(dto.getType())
-                .title(dto.getTitle())
-                .body(dto.getBody())
-                .read(dto.isRead())
-                .createdAt(Instant.now())
-                .build();
-        NotificationEntity saved = notificationRepository.save(entity);
-        NotificationDto out = toDto(saved);
-        broadcastToUser(dto.getUserId(), out);
-        return ResponseEntity.status(201).body(out);
-    }
-
-    private void broadcastToUser(Long userId, NotificationDto dto) {
-        CopyOnWriteArrayList<SseEmitter> emitters = emittersByUser.get(userId);
-        if (emitters == null || emitters.isEmpty()) return;
-
-        for (SseEmitter emitter : emitters) {
-            try {
-                emitter.send(SseEmitter.event().name("notification").data(dto));
-            } catch (IOException | IllegalStateException ex) {
-                removeEmitter(userId, emitter);
-            }
-        }
-    }
-
-    private void removeEmitter(Long userId, SseEmitter emitter) {
-        CopyOnWriteArrayList<SseEmitter> emitters = emittersByUser.get(userId);
-        if (emitters == null) return;
-        emitters.remove(emitter);
-        if (emitters.isEmpty()) {
-            emittersByUser.remove(userId, emitters);
-        }
-    }
-
-    private NotificationDto toDto(NotificationEntity entity) {
-        return NotificationDto.builder()
-                .id(entity.getId())
-                .userId(entity.getUserId())
-                .type(entity.getType())
-                .title(entity.getTitle())
-                .body(entity.getBody())
-                .read(entity.isRead())
-                .createdAt(entity.getCreatedAt())
-                .build();
-    }
-
-    private Specification<NotificationEntity> buildSpec(Long userId,
-                                                         Boolean read,
-                                                         String type,
-                                                         Instant from,
-                                                         Instant to,
-                                                         String q) {
-        return (root, query, cb) -> {
-            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("userId"), userId));
-
-            if (read != null) {
-                predicates.add(cb.equal(root.get("read"), read));
-            }
-            if (type != null) {
-                predicates.add(cb.equal(root.get("type"), type));
-            }
-            if (from != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));
-            }
-            if (to != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
-            }
-            if (q != null && !q.isBlank()) {
-                String pattern = "%" + q.toLowerCase(Locale.ROOT) + "%";
-                predicates.add(cb.or(
-                        cb.like(cb.lower(cb.coalesce(root.get("title"), "")), pattern),
-                        cb.like(cb.lower(cb.coalesce(root.get("body"), "")), pattern)
-                ));
-            }
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-        };
+        return notificationApplicationService.createInternal(dto);
     }
 }
