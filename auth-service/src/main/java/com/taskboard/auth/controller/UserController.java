@@ -31,6 +31,6 @@ public class UserController {
         Set<String> roles = u.getRoles().stream()
                 .map(r -> r.getName().name())
                 .collect(Collectors.toSet());
-        return new UserSummaryDto(u.getId(), u.getUsername(), roles);
+        return new UserSummaryDto(u.getId(), u.getUsername(), u.getEmail(), roles);
     }
 }

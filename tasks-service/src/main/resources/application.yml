@@ -24,6 +24,8 @@ spring:
 
 server:
   port: ${PORT:8082}
+  error:
+    include-message: always
 
 app:
   jwt:

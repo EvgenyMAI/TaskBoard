@@ -16,6 +16,7 @@
 ### 1) Выполните Register/Login и скопируйте JWT в `@token` / `@adminToken`.
 ### 2) Создайте проект, затем подставьте `@projectId`.
 ### 3) Добавьте участника в проект (`POST /projects/{id}/members`), затем создайте задачу.
+###    Поле assigneeId (если задано) допускается только для пользователя из membership этого проекта.
 ### 4) Проверьте уведомления и SSE-поток.
 ### Такой порядок соответствует setup для integration/e2e сценариев.
 
@@ -67,7 +68,7 @@ Content-Type: application/json
   "confirmationPhrase": "I_CONFIRM_PASSWORD_CHANGE"
 }
 
-### Users list
+### Users list (id, username, email, roles — для назначения исполнителей и админского UI)
 GET {{authHost}}/api/users
 Authorization: Bearer {{token}}
 

@@ -80,9 +80,9 @@
 - `Project detail` (детали проекта и задачи проекта);
 - `Tasks` (список задач + фильтры + создание);
 - `Task detail` (редактирование, комментарии, вложения, история);
-- `Analytics` (KPI, динамика периода, статусы, топ проектов/исполнителей, экспорт CSV);
-- `Notifications` (лента уведомлений, фильтры, read/unread);
-- `Profile` (изменение username/email и смена пароля);
+- `Analytics` (оформление как у профиля/уведомлений: hero, секции ◆; период и пресеты, CSV; KPI-карточки; динамика периода; статусы — кольцо или столбцы; топы проектов и исполнителей);
+- `Notifications` (лента в стиле профиля; разворачиваемые записи с превью и полным текстом; фильтры: прочитанность, тип, поиск — без периода по датам в UI; непрочитанное помечается прочитанным при раскрытии; «все прочитанными»);
+- `Profile` (данные профиля, смена пароля; для `ADMIN` — сворачиваемый блок «Управление ролями» с ленивой загрузкой списка, поиском по имени/почте и пагинацией);
 - `Login` / `Register`.
 
 Также в UI:
@@ -101,7 +101,7 @@
 - `GET /api/auth/me` — профиль текущего пользователя;
 - `PUT /api/auth/me` — обновление username/email;
 - `PUT /api/auth/me/password` — смена пароля с валидацией;
-- `GET /api/users` — список пользователей для назначения задач;
+- `GET /api/users` — список пользователей (для назначения задач и админского UI): `id`, `username`, `email`, `roles`;
 - `PUT /api/auth/users/{id}/roles` — обновление ролей пользователя (только `ADMIN`).
 
 ### 4.3 Tasks Service
@@ -147,7 +147,7 @@
 
 Уведомления (с сохранением в PostgreSQL):
 
-- `GET /api/notifications` (фильтры: `read`, `type`, `from`, `to`, `q`, `limit`)
+- `GET /api/notifications` (фильтры API: `read`, `type`, `from`, `to`, `q`, `limit`; в UI используются `read`, `type`, `q`)
 - `GET /api/notifications/unread`
 - `GET /api/notifications/stream` (SSE) — поток realtime-уведомлений для текущего пользователя
 - `PATCH /api/notifications/{id}/read`
@@ -170,6 +170,7 @@
 - первый зарегистрированный пользователь получает роль `ADMIN` (bootstrap-сценарий), последующие — `EXECUTOR`;
 - права видимости/действий по проектам и задачам проверяются на backend и дублируются ограничениями UI;
 - участие в проекте определяется таблицей `project_members` (отдельно от назначения задач);
+- при создании и изменении задачи исполнитель (`assigneeId`), если указан, должен быть участником этого проекта; иначе API возвращает ошибку с пояснением, интерфейс показывает текст ответа сервера;
 - пользователь не может читать чужие уведомления (фильтрация по `userId` из токена);
 - в публичном создании уведомлений `userId` берется из аутентификации, не из тела запроса;
 - внутренние уведомления между сервисами защищены `NOTIFICATIONS_INTERNAL_KEY`.
@@ -250,6 +251,8 @@ npm run dev
 
 ## 8. Как пользоваться приложением (через UI)
 
+Основные разделы (проекты, задачи, аналитика, уведомления, профиль и карточки сущностей) выдержаны в едином светлом визуальном стиле: поверхности карточек и секций на светлом фоне, спокойные акценты и рамки, согласованная типографика. Вверху типичен блок-герой с аватаром-буквой и чипами с понятными подписями («Задач: N», «Проектов: N», «Непрочитанных: N», выбранный период отчёта и т.п.), ниже — секции с заголовками и маркерами разделов.
+
 <details>
   <summary><strong>Шаг 1. Регистрация и вход</strong></summary>
 
@@ -260,10 +263,9 @@ npm run dev
 <details>
   <summary><strong>Шаг 2. Работа с проектами (Projects)</strong></summary>
 
-  - Страница проектов: [docs/screenshots/03-projects-create.png](docs/screenshots/03-projects-create.png)
-  - Создание проекта: [docs/screenshots/04-projects-create.png](docs/screenshots/04-projects-create.png)
-  - Управление проектом: [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
-  - Добавление/удаление участников проекта: [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
+  - Страница проектов: верхний блок (hero) с краткой сводкой и кнопкой создания, ниже секция со списком карточек проектов. [docs/screenshots/03-projects-create.png](docs/screenshots/03-projects-create.png)
+  - Создание и редактирование проекта (модальное окно): [docs/screenshots/04-projects-create.png](docs/screenshots/04-projects-create.png)
+  - Карточка проекта: тот же тип шапки, чипы «Задач: N» и при необходимости «Участников: N», секции фильтров, списка задач и формы новой задачи; для администратора и менеджера блок «Участники проекта» свёрнут по умолчанию (как управление ролями в профиле), внутри — поиск, пагинация и приглашение. [docs/screenshots/05-projects-create.png](docs/screenshots/05-projects-create.png)
 </details>
 
 <details>
@@ -276,7 +278,7 @@ npm run dev
 <details>
   <summary><strong>Шаг 4. Работа со списком задач (Tasks)</strong></summary>
 
-  - Общая страница задач: [docs/screenshots/08-tasks-create.png](docs/screenshots/08-tasks-create.png)
+  - Общая страница задач (hero, чип «Задач: N», фильтры и список): [docs/screenshots/08-tasks-create.png](docs/screenshots/08-tasks-create.png)
   - Создание задачи: [docs/screenshots/09-tasks-create.png](docs/screenshots/09-tasks-create.png)
   - Фильтрация задач по проекту: [docs/screenshots/10-tasks-create.png](docs/screenshots/10-tasks-create.png)
 </details>
@@ -288,21 +290,32 @@ npm run dev
   - Редактирование задачи: [docs/screenshots/12-task-detail.png](docs/screenshots/12-task-detail.png)
   - Добавление комментария: [docs/screenshots/13-task-detail.png](docs/screenshots/13-task-detail.png)
   - История изменений задачи: [docs/screenshots/14-task-detail.png](docs/screenshots/14-task-detail.png)
+  - Вкладки «Комментарии», «Вложения», «История»: комментарии и события истории — карточки; история с подписями полей на русском и парами «было/стало»; вложения — сетка карточек (предпросмотр изображений с увеличением по клику, просмотр текста в карточке); в списке исполнителей при редактировании — только участники проекта.
 </details>
 
 <details>
-  <summary><strong>Шаг 6. Уведомления (Notifications)</strong></summary>
+  <summary><strong>Шаг 6. Аналитика (Analytics)</strong></summary>
 
-  - Непрочитанные уведомления: [docs/screenshots/15-notifications.png](docs/screenshots/15-notifications.png)
-  - Прочитанные уведомления: [docs/screenshots/16-notifications.png](docs/screenshots/16-notifications.png)
+  - Выбор периода (`from` / `to`), пресеты длительности, выгрузка отчёта в CSV.
+  - Сводные показатели: подблок «Контекст» (всего задач, просрочено, без исполнителя) и «Коэффициенты» (завершение, доля просрочки, доля назначенных задач) — без дублирования детального разбора по статусам.
+  - При наличии данных — сравнение с предыдущим интервалом той же длины («Динамика периода»).
+  - Распределение по статусам: переключение вида «Кольцо» / «Столбцы», топы проектов и исполнителей ниже по странице.
+  - Скриншот: [docs/screenshots/19-analytics.png](docs/screenshots/19-analytics.png)
 </details>
 
 <details>
-  <summary><strong>Шаг 7. Профиль (Profile)</strong></summary>
+  <summary><strong>Шаг 7. Уведомления (Notifications)</strong></summary>
+
+  - Общий вид ленты и фильтров: [docs/screenshots/15-notifications.png](docs/screenshots/15-notifications.png)
+  - Пример с развёрнутой записью / прочитанными: [docs/screenshots/16-notifications.png](docs/screenshots/16-notifications.png)
+</details>
+
+<details>
+  <summary><strong>Шаг 8. Профиль (Profile)</strong></summary>
 
   - Страница профиля: [docs/screenshots/17-profile.png](docs/screenshots/17-profile.png)
   - Профиль после обновления: [docs/screenshots/18-profile.png](docs/screenshots/18-profile.png)
-  - Для `ADMIN`: управление ролями пользователей на странице профиля
+  - Для `ADMIN`: управление ролями в сворачиваемом блоке на странице профиля (список подгружается при раскрытии; при большом числе пользователей — поиск и постраничный просмотр).
 </details>
 
 ---
@@ -387,7 +400,8 @@ Frontend (`frontend/.env`):
 - регистрация/логин тестовых пользователей;
 - создание проекта через UI;
 - добавление участника и создание задачи (через API для стабильности smoke);
-- проверка, что назначенному исполнителю приходит уведомление на странице Notifications.
+- проверка, что назначенному исполнителю приходит уведомление на странице Notifications;
+- открытие `/analytics` и проверка заголовка и ключевых секций (период и выгрузка, сводные показатели).
 
 Почему часть шагов через API — это нормально:
 

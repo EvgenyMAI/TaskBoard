@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import Skeleton from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   getProject,
   getTasks,
@@ -22,6 +24,8 @@ const STATUS_LABELS = {
   CANCELLED: 'Отменена',
 };
 
+const PROJECT_MEMBERS_PAGE_SIZE = 12;
+
 function formatDueDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -33,6 +37,7 @@ export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
   const isExecutor = Boolean(user?.roles?.includes('EXECUTOR'));
@@ -54,6 +59,11 @@ export default function ProjectDetailPage() {
   const [inviting, setInviting] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterAssigneeId, setFilterAssigneeId] = useState('');
+  const [membersPanelOpen, setMembersPanelOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberPage, setMemberPage] = useState(1);
+
+  const heroLetter = (project?.name || 'P').trim().charAt(0).toUpperCase() || 'P';
 
   const loadProject = () => {
     getProject(id)
@@ -91,6 +101,41 @@ export default function ProjectDetailPage() {
     loadTasks();
   };
   const userName = (uid) => users.find((u) => u.id === uid)?.username || `#${uid}`;
+
+  const memberRows = useMemo(() => {
+    const ids = projectMembers || [];
+    return ids.map((uid) => {
+      const u = users.find((x) => x.id === uid);
+      return { uid, user: u, isOwner: project?.createdBy === uid };
+    });
+  }, [projectMembers, users, project?.createdBy]);
+
+  const filteredMemberRows = useMemo(() => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return memberRows;
+    return memberRows.filter(({ user: u, uid }) => {
+      const un = (u?.username || '').toLowerCase();
+      const em = (u?.email || '').toLowerCase();
+      const idStr = String(uid);
+      return un.includes(q) || em.includes(q) || idStr.includes(q);
+    });
+  }, [memberRows, memberSearch]);
+
+  const memberTotalPages = Math.max(1, Math.ceil(filteredMemberRows.length / PROJECT_MEMBERS_PAGE_SIZE));
+
+  useEffect(() => {
+    setMemberPage(1);
+  }, [memberSearch]);
+
+  useEffect(() => {
+    setMemberPage((p) => Math.min(p, memberTotalPages));
+  }, [memberTotalPages]);
+
+  const memberPageSafe = Math.min(memberPage, memberTotalPages);
+  const paginatedMemberRows = useMemo(() => {
+    const start = (memberPageSafe - 1) * PROJECT_MEMBERS_PAGE_SIZE;
+    return filteredMemberRows.slice(start, start + PROJECT_MEMBERS_PAGE_SIZE);
+  }, [filteredMemberRows, memberPageSafe]);
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
@@ -152,7 +197,14 @@ export default function ProjectDetailPage() {
   };
 
   const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Удалить участника из проекта?')) return;
+    const ok = await confirm({
+      title: 'Удалить участника',
+      message: 'Пользователь потеряет доступ к проекту и связанным задачам (задачи не удаляются).',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     setError('');
     try {
       await removeProjectMember(id, memberId);
@@ -164,8 +216,15 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleDeleteProject = () => {
-    if (!window.confirm(`Удалить проект «${project?.name}» и все задачи?`)) return;
+  const handleDeleteProject = async () => {
+    const ok = await confirm({
+      title: 'Удалить проект',
+      message: `Проект «${project?.name}» и все его задачи будут удалены без возможности восстановления.`,
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     setError('');
     deleteProject(id)
       .then(() => {
@@ -181,8 +240,14 @@ export default function ProjectDetailPage() {
   if (loading && !project) {
     return (
       <Layout>
-        <div className="container page-width">
-          <p className="muted">Загрузка...</p>
+        <div className="container page-width project-detail-page">
+          <div className="card profile-hero project-detail-hero">
+            <Skeleton style={{ height: 88 }} />
+          </div>
+          <ul className="task-list project-detail-skeleton-list">
+            <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
+            <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
+          </ul>
         </div>
       </Layout>
     );
@@ -191,9 +256,11 @@ export default function ProjectDetailPage() {
   if (!project) {
     return (
       <Layout>
-        <div className="container page-width">
-          <p className="error">Проект не найден.</p>
-          <Link to="/projects">← К списку проектов</Link>
+        <div className="container page-width project-detail-page">
+          <section className="card profile-section">
+            <p className="error">Проект не найден.</p>
+            <Link to="/projects">← К списку проектов</Link>
+          </section>
         </div>
       </Layout>
     );
@@ -201,95 +268,220 @@ export default function ProjectDetailPage() {
 
   return (
     <Layout>
-      <div className="container page-width">
-        <div className="breadcrumb">
+      <div className="container page-width project-detail-page">
+        <nav className="breadcrumb task-breadcrumb project-breadcrumb" aria-label="Навигация">
           <Link to="/projects">Проекты</Link>
           <span className="sep">/</span>
-          <span>{project.name}</span>
-        </div>
-        <div className="card page-intro">
-          <div>
-            <h1>{project.name}</h1>
-            {project.description && <p className="muted">{project.description}</p>}
+          <span className="breadcrumb-current">{project.name}</span>
+        </nav>
+
+        <header className="card profile-hero project-detail-hero">
+          <div className="profile-hero-main">
+            <div className="profile-avatar profile-avatar-project-detail" aria-hidden="true">{heroLetter}</div>
+            <div className="profile-hero-text">
+              <h1 className="task-detail-title">{project.name}</h1>
+              <div className="profile-hero-line">
+                <p className="profile-hero-sub">
+                  {project.description?.trim()
+                    ? project.description
+                    : 'Задачи и команда — всё в этом проекте'}
+                </p>
+                <div className="profile-role-chips" aria-live="polite">
+                  <span className="profile-chip-metric">Задач: {tasks.length}</span>
+                  {isAdminOrManager && (projectMembers || []).length > 0 && (
+                    <span className="profile-chip-metric">
+                      Участников: {(projectMembers || []).length}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="page-header">
-          <h2>Управление проектом</h2>
-          <div className="page-header-actions">
-            <button type="button" onClick={() => setShowTaskForm(!showTaskForm)}>
-              {showTaskForm ? 'Отмена' : '+ Новая задача'}
-            </button>
-            {isAdminOrManager && (
-              <button type="button" className="danger" onClick={handleDeleteProject}>
-                Удалить проект
+          <div className="profile-hero-hint profile-hero-hint-row">
+            <p className="muted small profile-hero-hint-text">
+              Задачи ниже; участников можно добавить в блоке «Участники проекта».
+            </p>
+            <div className="task-detail-hero-actions">
+              <button type="button" onClick={() => setShowTaskForm(!showTaskForm)}>
+                {showTaskForm ? 'Отмена' : '+ Новая задача'}
               </button>
-            )}
+              {isAdminOrManager && (
+                <button type="button" className="danger" onClick={handleDeleteProject}>
+                  Удалить проект
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-        {error && <p className="error">{error}</p>}
+        </header>
+
+        {error && <p className="error project-detail-global-error">{error}</p>}
 
         {isAdminOrManager && (
-          <div className="card">
-            <h2>Участники проекта</h2>
-            {membersLoading ? (
-              <p className="muted small">Загрузка...</p>
-            ) : (
-              <>
-                <ul className="card-list">
-                  {(projectMembers || []).map((uid) => {
-                    const u = users.find((x) => x.id === uid);
-                    const isOwner = project?.createdBy === uid;
-                    return (
-                      <li key={uid} className="card card-list-item">
-                        <div className="card-list-item-main">
-                          <strong>{u?.username || `#${uid}`}</strong>
-                          {isOwner && <span className="muted small"> (владелец)</span>}
-                        </div>
-                        {!isOwner && (
-                          <button
-                            type="button"
-                            className="danger small"
-                            onClick={() => handleRemoveMember(uid)}
-                          >
-                            Удалить
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                  {(projectMembers || []).length === 0 && (
-                    <li className="muted">Пока нет участников.</li>
-                  )}
-                </ul>
+          <section className={`card profile-section profile-admin-card project-members-card ${membersPanelOpen ? 'is-open' : ''}`}>
+            <button
+              type="button"
+              className="profile-admin-toggle"
+              aria-expanded={membersPanelOpen}
+              aria-controls="project-members-panel"
+              id="project-members-heading"
+              onClick={() => setMembersPanelOpen((v) => !v)}
+            >
+              <span className="profile-section-head profile-admin-toggle-inner">
+                <span className="profile-section-icon" aria-hidden="true">◆</span>
+                <span className="profile-admin-toggle-text">
+                  <span className="profile-admin-toggle-title">Участники проекта</span>
+                  <span className="muted small profile-admin-toggle-desc">
+                    Список, поиск и приглашение — после раскрытия.
+                  </span>
+                </span>
+              </span>
+              <span className={`profile-chevron ${membersPanelOpen ? 'open' : ''}`} aria-hidden="true" />
+            </button>
 
-                <form onSubmit={handleAddMember} className="form-group" style={{ marginTop: '1rem' }}>
-                  <label>Добавить участника</label>
-                  <select value={memberToAdd} onChange={(e) => setMemberToAdd(e.target.value)}>
-                    <option value="">— выбрать —</option>
-                    {users
-                      .filter((u) => !(projectMembers || []).includes(u.id))
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>{u.username}</option>
-                      ))}
-                  </select>
-                  <div className="form-actions">
-                    <button type="submit" disabled={inviting || !memberToAdd}>
-                      {inviting ? 'Добавление...' : 'Добавить'}
-                    </button>
-                  </div>
-                </form>
-              </>
+            {membersPanelOpen && (
+              <div
+                id="project-members-panel"
+                role="region"
+                aria-labelledby="project-members-heading"
+                className="profile-admin-panel"
+              >
+                {membersLoading ? (
+                  <Skeleton style={{ height: 160 }} />
+                ) : (
+                  <>
+                    <div className="profile-admin-toolbar">
+                      <label className="profile-admin-search-label">
+                        <span className="sr-only">Поиск участника</span>
+                        <input
+                          type="search"
+                          className="profile-admin-search"
+                          placeholder="Поиск по имени, почте или id…"
+                          value={memberSearch}
+                          onChange={(e) => setMemberSearch(e.target.value)}
+                          autoComplete="off"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="secondary small"
+                        onClick={() => refreshMembers()}
+                        disabled={membersLoading}
+                      >
+                        Обновить список
+                      </button>
+                    </div>
+                    <p className="muted small profile-admin-meta">
+                      В проекте: <strong>{memberRows.length}</strong>
+                      {memberSearch.trim() ? (
+                        <> · по запросу: <strong>{filteredMemberRows.length}</strong></>
+                      ) : null}
+                    </p>
+
+                    {filteredMemberRows.length === 0 ? (
+                      <p className="muted profile-admin-empty">
+                        {memberRows.length === 0
+                          ? 'Пока нет участников. Добавьте пользователя ниже.'
+                          : 'Никто не подходит под фильтр. Измените поисковый запрос.'}
+                      </p>
+                    ) : (
+                      <>
+                        <div className="role-management project-members-list">
+                          {paginatedMemberRows.map(({ uid, user: u, isOwner }) => (
+                            <div key={uid} className="role-row project-member-row">
+                              <div className="role-row-user">
+                                <strong>{u?.username || `#${uid}`}</strong>
+                                {isOwner && <span className="muted small"> (владелец)</span>}
+                                {u?.email ? (
+                                  <div className="muted small role-row-email">{u.email}</div>
+                                ) : null}
+                              </div>
+                              {!isOwner ? (
+                                <button
+                                  type="button"
+                                  className="danger small"
+                                  onClick={() => handleRemoveMember(uid)}
+                                >
+                                  Удалить
+                                </button>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+
+                        {memberTotalPages > 1 && (
+                          <div className="profile-admin-pagination">
+                            <button
+                              type="button"
+                              className="secondary small"
+                              disabled={memberPageSafe <= 1}
+                              onClick={() => setMemberPage((p) => Math.max(1, p - 1))}
+                            >
+                              Назад
+                            </button>
+                            <span className="muted small profile-admin-page-info">
+                              Стр. {memberPageSafe} из {memberTotalPages}
+                              {' · '}
+                              {(memberPageSafe - 1) * PROJECT_MEMBERS_PAGE_SIZE + 1}
+                              –
+                              {Math.min(memberPageSafe * PROJECT_MEMBERS_PAGE_SIZE, filteredMemberRows.length)}
+                              {' '}
+                              из {filteredMemberRows.length}
+                            </span>
+                            <button
+                              type="button"
+                              className="secondary small"
+                              disabled={memberPageSafe >= memberTotalPages}
+                              onClick={() => setMemberPage((p) => Math.min(memberTotalPages, p + 1))}
+                            >
+                              Вперёд
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <form onSubmit={handleAddMember} className="project-members-invite">
+                      <div className="form-group">
+                        <label htmlFor="project-add-member">Добавить участника</label>
+                        <select
+                          id="project-add-member"
+                          value={memberToAdd}
+                          onChange={(e) => setMemberToAdd(e.target.value)}
+                        >
+                          <option value="">— выбрать пользователя —</option>
+                          {users
+                            .filter((u) => !(projectMembers || []).includes(u.id))
+                            .map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.username}{u.email ? ` (${u.email})` : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" disabled={inviting || !memberToAdd}>
+                          {inviting ? 'Добавление...' : 'Добавить в проект'}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                )}
+              </div>
             )}
-          </div>
+          </section>
         )}
 
         {showTaskForm && (
-          <div className="card form-card">
-            <h2>Новая задача</h2>
+          <section className="card profile-section" aria-labelledby="project-new-task-heading">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="project-new-task-heading">Новая задача</h2>
+            </div>
             <form onSubmit={handleCreateTask}>
               <div className="form-group">
-                <label>Название</label>
+                <label htmlFor="project-task-title">Название</label>
                 <input
+                  id="project-task-title"
                   type="text"
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
@@ -298,15 +490,16 @@ export default function ProjectDetailPage() {
                 />
               </div>
               <div className="form-group">
-                <label>Описание</label>
+                <label htmlFor="project-task-desc">Описание</label>
                 <textarea
+                  id="project-task-desc"
                   value={taskDescription}
                   onChange={(e) => setTaskDescription(e.target.value)}
                   rows={2}
                   placeholder="Описание (необязательно)"
                 />
               </div>
-              <div className="form-row">
+              <div className="form-row tasks-filters-row">
                 <div className="form-group">
                   <label>Статус</label>
                   <select
@@ -357,15 +550,22 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </section>
         )}
 
-        <h2 className="section-title">Задачи ({tasks.length})</h2>
-        <div className="filters card">
-          <div className="form-row">
+        <section className="card profile-section" aria-labelledby="project-task-filters-heading">
+          <div className="profile-section-head">
+            <span className="profile-section-icon" aria-hidden="true">◆</span>
+            <h2 id="project-task-filters-heading">Фильтры списка задач</h2>
+          </div>
+          <div className="form-row tasks-filters-row">
             <div className="form-group">
-              <label>Статус</label>
-              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <label htmlFor="project-filter-status">Статус</label>
+              <select
+                id="project-filter-status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
                 <option value="">Любой</option>
                 {Object.entries(STATUS_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
@@ -373,8 +573,12 @@ export default function ProjectDetailPage() {
               </select>
             </div>
             <div className="form-group">
-              <label>Исполнитель</label>
-              <select value={filterAssigneeId} onChange={(e) => setFilterAssigneeId(e.target.value)}>
+              <label htmlFor="project-filter-assignee">Исполнитель</label>
+              <select
+                id="project-filter-assignee"
+                value={filterAssigneeId}
+                onChange={(e) => setFilterAssigneeId(e.target.value)}
+              >
                 <option value="">Все</option>
                 {(projectMembers || [])
                   .map((uid) => users.find((u) => u.id === uid))
@@ -385,36 +589,41 @@ export default function ProjectDetailPage() {
               </select>
             </div>
           </div>
-        </div>
-        {tasks.length === 0 ? (
-          <div className="card">
-            <p className="muted">Нет задач. Создайте первую задачу.</p>
+        </section>
+
+        <section className="card profile-section" aria-labelledby="project-tasks-list-heading">
+          <div className="profile-section-head">
+            <span className="profile-section-icon" aria-hidden="true">◆</span>
+            <h2 id="project-tasks-list-heading">Задачи проекта ({tasks.length})</h2>
           </div>
-        ) : (
-          <ul className="task-list">
-            {tasks.map((t) => (
-              <li key={t.id} className="card task-list-item">
-                <div className="task-item-content">
-                  <div className="task-item-header">
-                    <Link to={`/tasks/${t.id}`} className="task-title">
-                      {t.title}
-                    </Link>
-                    <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
-                      {STATUS_LABELS[t.status] || t.status}
-                    </span>
+          {tasks.length === 0 ? (
+            <p className="muted tasks-empty">Нет задач по выбранным фильтрам. Создайте первую задачу.</p>
+          ) : (
+            <ul className="task-list project-detail-task-list">
+              {tasks.map((t) => (
+                <li key={t.id} className="card task-list-item">
+                  <div className="task-item-content">
+                    <div className="task-item-header">
+                      <Link to={`/tasks/${t.id}`} className="task-title">
+                        {t.title}
+                      </Link>
+                      <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
+                        {STATUS_LABELS[t.status] || t.status}
+                      </span>
+                    </div>
+                    <div className="task-item-meta">
+                      <span className="meta-chip">Исполнитель: {t.assigneeId ? userName(t.assigneeId) : '—'}</span>
+                      <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
+                    </div>
                   </div>
-                  <div className="task-item-meta">
-                    <span className="meta-chip">Исполнитель: {t.assigneeId ? userName(t.assigneeId) : '—'}</span>
-                    <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
-                  </div>
-                </div>
-                <Link to={`/tasks/${t.id}`} className="btn-link">
-                  Открыть →
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <Link to={`/tasks/${t.id}`} className="btn-link">
+                    Открыть →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </Layout>
   );

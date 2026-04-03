@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -125,6 +126,174 @@ class TasksIntegrationTest {
         mockMvc.perform(multipart("/api/tasks/" + task2Id + "/attachments/upload")
                         .file(file)
                         .header("Authorization", "Bearer " + execToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createTaskWithNonMemberAssigneeForbidden() throws Exception {
+        String adminToken = jwt(1L, List.of("ADMIN"));
+        String projectJson = mockMvc.perform(post("/api/projects")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"P-nonmember\",\"description\":\"d\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long projectId = objectMapper.readTree(projectJson).get("id").asLong();
+        mockMvc.perform(post("/api/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":2}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":%d,"title":"X","status":"OPEN","assigneeId":99}
+                                """.formatted(projectId)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateTaskAssigneeMustBeProjectMember() throws Exception {
+        String adminToken = jwt(1L, List.of("ADMIN"));
+        String projectJson = mockMvc.perform(post("/api/projects")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"P-update\",\"description\":\"d\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long projectId = objectMapper.readTree(projectJson).get("id").asLong();
+        mockMvc.perform(post("/api/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":2}"))
+                .andExpect(status().isCreated());
+        String taskJson = mockMvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":%d,"title":"T-upd","status":"OPEN","assigneeId":2}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long taskId = objectMapper.readTree(taskJson).get("id").asLong();
+
+        mockMvc.perform(put("/api/tasks/" + taskId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"T-upd","description":"","status":"IN_PROGRESS","assigneeId":4,"dueDate":null}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateTaskAssigneeToAnotherMemberSucceeds() throws Exception {
+        String adminToken = jwt(1L, List.of("ADMIN"));
+        String projectJson = mockMvc.perform(post("/api/projects")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"P-reassign\",\"description\":\"d\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long projectId = objectMapper.readTree(projectJson).get("id").asLong();
+        mockMvc.perform(post("/api/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":2}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":3}"))
+                .andExpect(status().isCreated());
+        String taskJson = mockMvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":%d,"title":"T-re","status":"OPEN","assigneeId":2}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long taskId = objectMapper.readTree(taskJson).get("id").asLong();
+
+        mockMvc.perform(put("/api/tasks/" + taskId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"T-re","description":"","status":"OPEN","assigneeId":3,"dueDate":null}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(3));
+    }
+
+    @Test
+    void updateTaskClearAssigneeAllowed() throws Exception {
+        String adminToken = jwt(1L, List.of("ADMIN"));
+        String projectJson = mockMvc.perform(post("/api/projects")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"P-null-asg\",\"description\":\"d\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long projectId = objectMapper.readTree(projectJson).get("id").asLong();
+        mockMvc.perform(post("/api/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":2}"))
+                .andExpect(status().isCreated());
+        String taskJson = mockMvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":%d,"title":"T-null","status":"OPEN","assigneeId":2}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long taskId = objectMapper.readTree(taskJson).get("id").asLong();
+
+        mockMvc.perform(put("/api/tasks/" + taskId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"T-null","description":"","status":"OPEN","assigneeId":null,"dueDate":null}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assigneeId").value(nullValue()));
+    }
+
+    @Test
+    void managerCannotReassignTaskToNonProjectMember() throws Exception {
+        String adminToken = jwt(1L, List.of("ADMIN"));
+        String managerToken = jwt(10L, List.of("MANAGER"));
+        String projectJson = mockMvc.perform(post("/api/projects")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"P-mgr\",\"description\":\"d\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long projectId = objectMapper.readTree(projectJson).get("id").asLong();
+        mockMvc.perform(post("/api/projects/" + projectId + "/members")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":2}"))
+                .andExpect(status().isCreated());
+        String taskJson = mockMvc.perform(post("/api/tasks")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId":%d,"title":"T-mgr","status":"OPEN","assigneeId":2}
+                                """.formatted(projectId)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long taskId = objectMapper.readTree(taskJson).get("id").asLong();
+
+        mockMvc.perform(put("/api/tasks/" + taskId)
+                        .header("Authorization", "Bearer " + managerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"T-mgr","description":"","status":"OPEN","assigneeId":7,"dueDate":null}
+                                """))
                 .andExpect(status().isForbidden());
     }
 }

@@ -31,6 +31,8 @@ export default function TasksPage() {
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const { user } = useAuth();
+  const username = user?.username || '';
+  const heroLetter = username ? username.charAt(0).toUpperCase() : 'T';
   const isExecutor = user?.roles?.includes('EXECUTOR');
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -147,24 +149,46 @@ export default function TasksPage() {
 
   return (
     <Layout>
-      <div className="container page-width">
-        <div className="card page-intro">
-          <h1>Задачи</h1>
-          <p className="muted">Фильтруйте, отслеживайте статусы и быстро переходите в карточки задач.</p>
-        </div>
-        <div className="page-header">
-          <h2>Список задач</h2>
-          <button type="button" onClick={() => setShowCreate(!showCreate)}>
-            {showCreate ? 'Отмена' : '+ Создать задачу'}
-          </button>
-        </div>
-        {error && <p className="error">{error}</p>}
+      <div className="container page-width tasks-page">
+        <header className="card profile-hero tasks-hero">
+          <div className="profile-hero-main">
+            <div className="profile-avatar profile-avatar-tasks" aria-hidden="true">{heroLetter}</div>
+            <div className="profile-hero-text">
+              <h1>Задачи</h1>
+              <div className="profile-hero-line">
+                <p className="profile-hero-sub">
+                  {username ? `Все ваши задачи, ${username}` : 'Отфильтруйте по проекту, статусу или исполнителю'}
+                </p>
+                <div className="profile-role-chips" aria-live="polite">
+                  <span className="profile-chip-metric">
+                    {loading ? 'Загрузка…' : `Задач: ${tasks.length}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="profile-hero-hint profile-hero-hint-row">
+            <p className="muted small profile-hero-hint-text">
+              В карточке задачи — комментарии, файлы и история изменений.
+            </p>
+            <button type="button" onClick={() => setShowCreate(!showCreate)}>
+              {showCreate ? 'Отмена' : '+ Создать задачу'}
+            </button>
+          </div>
+        </header>
 
-        <div className="filters card">
-          <div className="form-row">
+        {error && <p className="error tasks-global-error">{error}</p>}
+
+        <section className="card profile-section" aria-labelledby="tasks-filters-heading">
+          <div className="profile-section-head">
+            <span className="profile-section-icon" aria-hidden="true">◆</span>
+            <h2 id="tasks-filters-heading">Фильтры</h2>
+          </div>
+          <div className="form-row tasks-filters-row">
             <div className="form-group">
-              <label>Проект</label>
+              <label htmlFor="task-filter-project">Проект</label>
               <select
+                id="task-filter-project"
                 value={filterProjectId}
                 onChange={(e) => setFilterProjectId(e.target.value)}
               >
@@ -175,8 +199,9 @@ export default function TasksPage() {
               </select>
             </div>
             <div className="form-group">
-              <label>Статус</label>
+              <label htmlFor="task-filter-status">Статус</label>
               <select
+                id="task-filter-status"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
@@ -187,8 +212,9 @@ export default function TasksPage() {
               </select>
             </div>
             <div className="form-group">
-              <label>Исполнитель</label>
+              <label htmlFor="task-filter-assignee">Исполнитель</label>
               <select
+                id="task-filter-assignee"
                 value={filterAssigneeId}
                 onChange={(e) => setFilterAssigneeId(e.target.value)}
               >
@@ -199,15 +225,19 @@ export default function TasksPage() {
               </select>
             </div>
           </div>
-        </div>
+        </section>
 
         {showCreate && (
-          <div className="card form-card">
-            <h2>Новая задача</h2>
+          <section className="card profile-section" aria-labelledby="tasks-new-heading">
+            <div className="profile-section-head">
+              <span className="profile-section-icon" aria-hidden="true">◆</span>
+              <h2 id="tasks-new-heading">Новая задача</h2>
+            </div>
             <form onSubmit={handleCreateTask}>
               <div className="form-group">
-                <label>Проект *</label>
+                <label htmlFor="task-new-project">Проект *</label>
                 <select
+                  id="task-new-project"
                   value={formProjectId}
                   onChange={(e) => setFormProjectId(e.target.value)}
                   onBlur={() => setTouched((prev) => ({ ...prev, projectId: true }))}
@@ -222,8 +252,9 @@ export default function TasksPage() {
                 {touched.projectId && projectError && <p className="field-error">{projectError}</p>}
               </div>
               <div className="form-group">
-                <label>Название</label>
+                <label htmlFor="task-new-title">Название</label>
                 <input
+                  id="task-new-title"
                   type="text"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
@@ -234,8 +265,9 @@ export default function TasksPage() {
                 {touched.title && titleError && <p className="field-error">{titleError}</p>}
               </div>
               <div className="form-group">
-                <label>Описание</label>
+                <label htmlFor="task-new-desc">Описание</label>
                 <textarea
+                  id="task-new-desc"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   rows={2}
@@ -288,45 +320,49 @@ export default function TasksPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </section>
         )}
 
-        {loading ? (
-          <ul className="task-list">
-            <li className="card"><Skeleton style={{ height: 62 }} /></li>
-            <li className="card"><Skeleton style={{ height: 62 }} /></li>
-            <li className="card"><Skeleton style={{ height: 62 }} /></li>
-          </ul>
-        ) : tasks.length === 0 ? (
-          <div className="card">
-            <p className="muted">Нет задач по выбранным фильтрам.</p>
+        <section className="card profile-section" aria-labelledby="tasks-list-heading">
+          <div className="profile-section-head">
+            <span className="profile-section-icon" aria-hidden="true">◆</span>
+            <h2 id="tasks-list-heading">Список задач</h2>
           </div>
-        ) : (
-          <ul className="task-list">
-            {tasks.map((t) => (
-              <li key={t.id} className="card task-list-item">
-                <div className="task-item-content">
-                  <div className="task-item-header">
-                    <Link to={`/tasks/${t.id}`} className="task-title">
-                      {t.title}
-                    </Link>
-                    <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
-                      {STATUS_LABELS[t.status] || t.status}
-                    </span>
+          {loading ? (
+            <ul className="task-list">
+              <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
+              <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
+              <li className="card task-list-item-skeleton"><Skeleton style={{ height: 62 }} /></li>
+            </ul>
+          ) : tasks.length === 0 ? (
+            <p className="muted tasks-empty">Нет задач по выбранным фильтрам.</p>
+          ) : (
+            <ul className="task-list">
+              {tasks.map((t) => (
+                <li key={t.id} className="card task-list-item">
+                  <div className="task-item-content">
+                    <div className="task-item-header">
+                      <Link to={`/tasks/${t.id}`} className="task-title">
+                        {t.title}
+                      </Link>
+                      <span className={`badge badge-${(t.status || '').toLowerCase()}`}>
+                        {STATUS_LABELS[t.status] || t.status}
+                      </span>
+                    </div>
+                    <div className="task-item-meta">
+                      <span className="meta-chip">Проект: {t.projectId ? projectById(t.projectId) : '—'}</span>
+                      <span className="meta-chip">Исполнитель: {t.assigneeId ? userById(t.assigneeId) : '—'}</span>
+                      <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
+                    </div>
                   </div>
-                  <div className="task-item-meta">
-                    <span className="meta-chip">Проект: {t.projectId ? projectById(t.projectId) : '—'}</span>
-                    <span className="meta-chip">Исполнитель: {t.assigneeId ? userById(t.assigneeId) : '—'}</span>
-                    <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
-                  </div>
-                </div>
-                <Link to={`/tasks/${t.id}`} className="btn-link">
-                  Открыть →
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <Link to={`/tasks/${t.id}`} className="btn-link">
+                    Открыть →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </Layout>
   );

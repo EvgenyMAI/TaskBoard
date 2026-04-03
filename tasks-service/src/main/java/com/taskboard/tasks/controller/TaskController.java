@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -106,12 +107,16 @@ public class TaskController {
 
         if (isExecutor) {
             boolean isMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(project.getId(), userId);
-            if (!isMember) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            if (!isMember) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Вы не состоите в этом проекте");
+            }
         } else {
             // Для ADMIN/MANAGER: назначать задачу можно только участнику проекта.
             if (dto.getAssigneeId() != null) {
                 boolean assigneeIsMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(project.getId(), dto.getAssigneeId());
-                if (!assigneeIsMember) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                if (!assigneeIsMember) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Исполнитель должен быть участником проекта");
+                }
             }
         }
 
@@ -137,17 +142,29 @@ public class TaskController {
         Long userId = RoleAuthorization.userId(auth);
         boolean isExecutor = RoleAuthorization.isExecutor(auth);
 
-        Task existing = taskRepository.findById(id)
+        Task existing = taskRepository.findByIdWithProject(id)
                 .orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
 
         if (isExecutor) {
             // EXECUTOR может обновлять только задачи, назначенные ему.
             if (existing.getAssigneeId() == null || !existing.getAssigneeId().equals(userId)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Редактировать можно только задачи, назначенные на вас");
             }
             // EXECUTOR не может пере назначать задачу на другого пользователя.
             dto.setAssigneeId(existing.getAssigneeId());
+        } else {
+            // ADMIN/MANAGER: исполнитель должен быть участником проекта задачи (как при создании).
+            if (dto.getAssigneeId() != null) {
+                Long projectId = existing.getProjectId();
+                if (projectId == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "У задачи не задан проект");
+                }
+                boolean assigneeIsMember = projectMemberRepository.existsByIdProjectIdAndIdUserId(projectId, dto.getAssigneeId());
+                if (!assigneeIsMember) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Исполнитель должен быть участником проекта");
+                }
+            }
         }
 
         Task updated = Task.builder()
