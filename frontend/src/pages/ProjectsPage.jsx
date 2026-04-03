@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import FormField from '../components/FormField';
 import Skeleton from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   getProjects,
   createProject,
@@ -15,6 +16,7 @@ import {
 
 export default function ProjectsPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const username = user?.username || '';
   const heroLetter = username ? username.charAt(0).toUpperCase() : 'P';
@@ -88,7 +90,14 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = async (project) => {
-    if (!window.confirm(`Удалить проект «${project.name}»? Все задачи проекта также будут удалены.`)) return;
+    const ok = await confirm({
+      title: 'Удалить проект',
+      message: `Проект «${project.name}» и все его задачи будут удалены без возможности восстановления.`,
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     setError('');
     try {
       await deleteProject(project.id);
@@ -111,8 +120,8 @@ export default function ProjectsPage() {
               <div className="profile-hero-line">
                 <p className="profile-hero-sub">
                   {username
-                    ? `Рабочее пространство для ${username}`
-                    : 'Структурируйте задачи по направлениям и открывайте карточку проекта'}
+                    ? `Ваши проекты, ${username}`
+                    : 'Задачи сгруппированы по проектам — откройте нужный'}
                 </p>
                 <div className="profile-role-chips" aria-live="polite">
                   <span className="profile-chip-metric">
@@ -125,8 +134,8 @@ export default function ProjectsPage() {
           <div className="profile-hero-hint profile-hero-hint-row">
             <p className="muted small profile-hero-hint-text">
               {isAdminOrManager
-                ? 'Создавайте проекты, приглашайте участников в карточке проекта и ведите задачи в одном месте.'
-                : 'Откройте проект, чтобы увидеть задачи, где вы участник команды.'}
+                ? 'Создайте проект и пригласите команду — всё настраивается в карточке проекта.'
+                : 'Откройте проект, в котором вы участник, чтобы увидеть задачи.'}
             </p>
             {isAdminOrManager && (
               <button type="button" onClick={openCreate}>

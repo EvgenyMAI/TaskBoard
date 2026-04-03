@@ -157,7 +157,7 @@ export default function TasksPage() {
               <h1>Задачи</h1>
               <div className="profile-hero-line">
                 <p className="profile-hero-sub">
-                  {username ? `Рабочий список для ${username}` : 'Фильтры по проекту, статусу и исполнителю'}
+                  {username ? `Все ваши задачи, ${username}` : 'Отфильтруйте по проекту, статусу или исполнителю'}
                 </p>
                 <div className="profile-role-chips" aria-live="polite">
                   <span className="profile-chip-metric">
@@ -169,7 +169,7 @@ export default function TasksPage() {
           </div>
           <div className="profile-hero-hint profile-hero-hint-row">
             <p className="muted small profile-hero-hint-text">
-              Создавайте задачи, переходите в карточку для комментариев, вложений и истории изменений.
+              В карточке задачи — комментарии, файлы и история изменений.
             </p>
             <button type="button" onClick={() => setShowCreate(!showCreate)}>
               {showCreate ? 'Отмена' : '+ Создать задачу'}

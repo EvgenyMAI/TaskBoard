@@ -214,7 +214,9 @@ export default function ProfilePage() {
             </div>
           </div>
           <p className="muted small profile-hero-hint">
-            Управляйте данными профиля и безопасностью учётной записи.
+            {isAdmin
+              ? 'Имя, почта и пароль. Ниже можно менять роли пользователей.'
+              : 'Имя, почта и пароль вашей учётной записи.'}
           </p>
         </header>
 
@@ -322,7 +324,7 @@ export default function ProfilePage() {
                 <span className="profile-admin-toggle-text">
                   <span className="profile-admin-toggle-title">Управление ролями</span>
                   <span className="muted small profile-admin-toggle-desc">
-                    Список загружается только при раскрытии. Для больших команд — поиск и постраничный просмотр.
+                    Список пользователей и поиск — после раскрытия.
                   </span>
                 </span>
               </span>

@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import Skeleton from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   getProject,
   getTasks,
@@ -36,6 +37,7 @@ export default function ProjectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isAdminOrManager = Boolean(user?.roles?.includes('ADMIN') || user?.roles?.includes('MANAGER'));
   const isExecutor = Boolean(user?.roles?.includes('EXECUTOR'));
@@ -195,7 +197,14 @@ export default function ProjectDetailPage() {
   };
 
   const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Удалить участника из проекта?')) return;
+    const ok = await confirm({
+      title: 'Удалить участника',
+      message: 'Пользователь потеряет доступ к проекту и связанным задачам (задачи не удаляются).',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     setError('');
     try {
       await removeProjectMember(id, memberId);
@@ -207,8 +216,15 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleDeleteProject = () => {
-    if (!window.confirm(`Удалить проект «${project?.name}» и все задачи?`)) return;
+  const handleDeleteProject = async () => {
+    const ok = await confirm({
+      title: 'Удалить проект',
+      message: `Проект «${project?.name}» и все его задачи будут удалены без возможности восстановления.`,
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     setError('');
     deleteProject(id)
       .then(() => {
@@ -268,7 +284,7 @@ export default function ProjectDetailPage() {
                 <p className="profile-hero-sub">
                   {project.description?.trim()
                     ? project.description
-                    : 'Карточка проекта: задачи и участники команды'}
+                    : 'Задачи и команда — всё в этом проекте'}
                 </p>
                 <div className="profile-role-chips" aria-live="polite">
                   <span className="profile-chip-metric">Задач: {tasks.length}</span>
@@ -283,7 +299,7 @@ export default function ProjectDetailPage() {
           </div>
           <div className="profile-hero-hint profile-hero-hint-row">
             <p className="muted small profile-hero-hint-text">
-              Создавайте задачи и открывайте карточки для деталей. Состав команды настраивается в сворачиваемом блоке ниже.
+              Задачи ниже; участников можно добавить в блоке «Участники проекта».
             </p>
             <div className="task-detail-hero-actions">
               <button type="button" onClick={() => setShowTaskForm(!showTaskForm)}>
@@ -315,7 +331,7 @@ export default function ProjectDetailPage() {
                 <span className="profile-admin-toggle-text">
                   <span className="profile-admin-toggle-title">Участники проекта</span>
                   <span className="muted small profile-admin-toggle-desc">
-                    Список и приглашение — по раскрытию. Для больших команд — поиск и постраничный просмотр.
+                    Список, поиск и приглашение — после раскрытия.
                   </span>
                 </span>
               </span>

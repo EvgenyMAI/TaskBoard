@@ -193,7 +193,7 @@ export default function NotificationsPage() {
               <h1>Уведомления</h1>
               <div className="profile-hero-line">
                 <p className="profile-hero-sub">
-                  {username ? `События для ${username}` : 'События по вашим задачам'}
+                  {username ? `${username}, ваша лента событий` : 'Назначения, статусы и другие изменения по задачам'}
                 </p>
                 <div className="profile-role-chips" aria-live="polite">
                   {unreadCount > 0 ? (
@@ -209,7 +209,7 @@ export default function NotificationsPage() {
           </div>
           <div className="profile-hero-hint profile-hero-hint-row">
             <p className="muted small profile-hero-hint-text">
-              Создание и назначение задач, смена статуса — обновления приходят по SSE в реальном времени.
+              Новые события появляются здесь сами — обновлять страницу не нужно.
             </p>
             <button
               type="button"

@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import Skeleton from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
 import {
   getTask,
   updateTask,
@@ -52,6 +53,7 @@ export default function TaskDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const [task, setTask] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -182,8 +184,15 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleDeleteTask = () => {
-    if (!window.confirm('Удалить эту задачу?')) return;
+  const handleDeleteTask = async () => {
+    const ok = await confirm({
+      title: 'Удалить задачу',
+      message: 'Задача будет удалена без возможности восстановления.',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     setError('');
     deleteTask(id)
       .then(() => {
@@ -214,8 +223,15 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleDeleteComment = (commentId) => {
-    if (!window.confirm('Удалить комментарий?')) return;
+  const handleDeleteComment = async (commentId) => {
+    const ok = await confirm({
+      title: 'Удалить комментарий',
+      message: 'Комментарий будет удалён без возможности восстановления.',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     deleteComment(id, commentId)
       .then(() => {
         toast.success('Комментарий удалён');
@@ -245,8 +261,15 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleDeleteAttachment = (attachmentId) => {
-    if (!window.confirm('Удалить вложение?')) return;
+  const handleDeleteAttachment = async (attachmentId) => {
+    const ok = await confirm({
+      title: 'Удалить вложение',
+      message: 'Файл будет удалён из задачи без возможности восстановления.',
+      confirmText: 'Удалить',
+      cancelText: 'Отмена',
+      danger: true,
+    });
+    if (!ok) return;
     deleteAttachment(id, attachmentId)
       .then(() => {
         toast.success('Вложение удалено');
@@ -453,11 +476,11 @@ export default function TaskDetailPage() {
                 <p className="profile-hero-sub">
                   {task.projectId ? (
                     <>
-                      Проект:{' '}
+                      В проекте:{' '}
                       <Link to={`/projects/${task.projectId}`}>{projectName(task.projectId)}</Link>
                     </>
                   ) : (
-                    'Карточка задачи'
+                    'Задача без привязки к проекту'
                   )}
                 </p>
                 <div className="profile-role-chips">
@@ -595,19 +618,32 @@ export default function TaskDetailPage() {
               <h2 id="task-summary-heading">Сводка</h2>
             </div>
             <div className="task-detail-summary">
-              <p><strong>Статус:</strong>{' '}
-                <span className={`badge badge-${(task.status || '').toLowerCase()}`}>
+              <div className="task-summary-row">
+                <span className="task-summary-label">Статус</span>
+                <span className={`badge badge-${(task.status || '').toLowerCase()} task-summary-badge`}>
                   {STATUS_LABELS[task.status] || task.status}
                 </span>
-              </p>
+              </div>
+
               {task.description && (
-                <p><strong>Описание:</strong><br />{task.description}</p>
+                <div className="task-summary-row">
+                  <span className="task-summary-label">Описание</span>
+                  <span className="task-detail-description">{task.description}</span>
+                </div>
               )}
+
               {task.assigneeId && (
-                <p><strong>Исполнитель:</strong> {userName(task.assigneeId)}</p>
+                <div className="task-summary-row">
+                  <span className="task-summary-label">Исполнитель</span>
+                  <span className="task-summary-value">{userName(task.assigneeId)}</span>
+                </div>
               )}
+
               {task.dueDate && (
-                <p><strong>Срок:</strong> {formatDate(task.dueDate)}</p>
+                <div className="task-summary-row">
+                  <span className="task-summary-label">Срок</span>
+                  <span className="task-summary-value">{formatDate(task.dueDate)}</span>
+                </div>
               )}
             </div>
           </section>
@@ -691,7 +727,7 @@ export default function TaskDetailPage() {
                             {(isAdminOrManager || c.authorId === currentUserId) && (
                               <button
                                 type="button"
-                                className="secondary small danger task-comment-delete"
+                                className="small danger task-comment-delete"
                                 onClick={() => handleDeleteComment(c.id)}
                               >
                                 Удалить
@@ -765,7 +801,7 @@ export default function TaskDetailPage() {
                               Скачать
                             </button>
                             {(isAdminOrManager || a.uploadedBy === currentUserId) && (
-                              <button type="button" className="secondary small danger" onClick={() => handleDeleteAttachment(a.id)}>
+                              <button type="button" className="small danger" onClick={() => handleDeleteAttachment(a.id)}>
                                 Удалить
                               </button>
                             )}
