@@ -1,59 +1,29 @@
 package com.taskboard.analytics.config;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
+import com.taskboard.common.jwt.ResourceServerJwtParser;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Component
 public class JwtConfig {
 
-    @Value("${app.jwt.secret:taskboard-auth-secret-key-min-256-bits-for-hs256}")
-    private String jwtSecret;
+    private final ResourceServerJwtParser parser;
 
-    public SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    public JwtConfig(@Value("${app.jwt.secret:taskboard-auth-secret-key-min-256-bits-for-hs256}") String jwtSecret) {
+        this.parser = new ResourceServerJwtParser(jwtSecret);
     }
 
     public boolean validateToken(String token) {
-        try {
-            Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return parser.validateToken(token);
     }
 
     public Long getUserIdFromToken(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-        return claims.get("userId", Long.class);
+        return parser.getUserIdFromToken(token);
     }
 
     public List<String> getRolesFromToken(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-        Object rolesObj = claims.get("roles");
-        if (rolesObj == null) return List.of();
-        if (rolesObj instanceof List<?> list) {
-            return list.stream()
-                    .filter(Objects::nonNull)
-                    .map(Object::toString)
-                    .collect(Collectors.toList());
-        }
-        return List.of();
+        return parser.getRolesFromToken(token);
     }
 }

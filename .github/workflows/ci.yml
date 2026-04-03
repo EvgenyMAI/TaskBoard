@@ -24,13 +24,8 @@ jobs:
         working-directory: auth-service
         run: mvn -B test
 
-      - name: Tasks service tests
-        working-directory: tasks-service
-        run: mvn -B test
-
-      - name: Analytics service tests
-        working-directory: analytics-service
-        run: mvn -B test
+      - name: Tasks + analytics (includes taskboard-common)
+        run: mvn -B -pl tasks-service,analytics-service -am test
 
   e2e:
     runs-on: ubuntu-latest

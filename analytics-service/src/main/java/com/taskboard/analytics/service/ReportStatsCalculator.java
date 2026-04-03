@@ -1,12 +1,10 @@
 package com.taskboard.analytics.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.taskboard.analytics.util.JsonNodeFields;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -35,24 +33,24 @@ public class ReportStatsCalculator {
         int withoutAssignee = 0;
         Instant now = Instant.now();
         for (JsonNode task : tasks) {
-            String status = text(task, "status");
+            String status = JsonNodeFields.text(task, "status");
             if (status != null) {
                 byStatus.computeIfPresent(status, (k, v) -> v + 1);
             }
 
-            Long projectId = longVal(task, "projectId");
+            Long projectId = JsonNodeFields.longVal(task, "projectId");
             if (projectId != null) {
                 byProject.merge(projectId, 1, Integer::sum);
             }
 
-            Long assigneeId = longVal(task, "assigneeId");
+            Long assigneeId = JsonNodeFields.longVal(task, "assigneeId");
             if (assigneeId != null) {
                 byAssignee.merge(assigneeId, 1, Integer::sum);
             } else {
                 withoutAssignee++;
             }
 
-            Instant due = instant(task, "dueDate");
+            Instant due = JsonNodeFields.instant(task, "dueDate");
             if (due != null && due.isBefore(now) && !"DONE".equals(status) && !"CANCELLED".equals(status)) {
                 overdue++;
             }
@@ -120,38 +118,6 @@ public class ReportStatsCalculator {
             result.add(row);
         }
         return result;
-    }
-
-    private static String text(JsonNode node, String field) {
-        JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
-    }
-
-    private static Long longVal(JsonNode node, String field) {
-        JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asLong();
-    }
-
-    private static Instant instant(JsonNode node, String field) {
-        String value = text(node, field);
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Instant.parse(value);
-        } catch (Exception ignored) {
-            // fall through
-        }
-        try {
-            return OffsetDateTime.parse(value).toInstant();
-        } catch (Exception ignored) {
-            // fall through
-        }
-        try {
-            return LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toInstant();
-        } catch (Exception ignored) {
-            return null;
-        }
     }
 
     private static double percentDelta(int current, int previous) {

@@ -17,6 +17,7 @@ build/
 # Env
 .env
 .env.local
+.env.e2e.*.tmp
 *.log
 logs/
 playwright-report/

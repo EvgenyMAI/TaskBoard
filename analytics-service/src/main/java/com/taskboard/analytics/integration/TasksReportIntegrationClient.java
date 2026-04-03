@@ -2,6 +2,7 @@ package com.taskboard.analytics.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskboard.analytics.util.JsonNodeFields;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -12,9 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,9 +47,9 @@ public class TasksReportIntegrationClient {
             JsonNode content = body.isArray() ? body : body.path("content");
             if (content.isArray()) {
                 for (JsonNode task : content) {
-                    Instant filterDate = instant(task, "dueDate");
+                    Instant filterDate = JsonNodeFields.instant(task, "dueDate");
                     if (filterDate == null) {
-                        filterDate = instant(task, "createdAt");
+                        filterDate = JsonNodeFields.instant(task, "createdAt");
                     }
                     if (from != null && filterDate != null && filterDate.isBefore(from)) {
                         continue;
@@ -73,9 +71,9 @@ public class TasksReportIntegrationClient {
         JsonNode body = getJson(tasksBaseUrl + "/api/projects", bearerToken);
         if (body != null && body.isArray()) {
             for (JsonNode item : body) {
-                Long id = longVal(item, "id");
+                Long id = JsonNodeFields.longVal(item, "id");
                 if (id != null) {
-                    map.put(id, text(item, "name"));
+                    map.put(id, JsonNodeFields.text(item, "name"));
                 }
             }
         }
@@ -87,9 +85,9 @@ public class TasksReportIntegrationClient {
         JsonNode body = getJson(authBaseUrl + "/api/users", bearerToken);
         if (body != null && body.isArray()) {
             for (JsonNode item : body) {
-                Long id = longVal(item, "id");
+                Long id = JsonNodeFields.longVal(item, "id");
                 if (id != null) {
-                    map.put(id, text(item, "username"));
+                    map.put(id, JsonNodeFields.text(item, "username"));
                 }
             }
         }
@@ -106,38 +104,6 @@ public class TasksReportIntegrationClient {
                 return null;
             }
             return objectMapper.readTree(response.getBody());
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static String text(JsonNode node, String field) {
-        JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
-    }
-
-    private static Long longVal(JsonNode node, String field) {
-        JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asLong();
-    }
-
-    private static Instant instant(JsonNode node, String field) {
-        String value = text(node, field);
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Instant.parse(value);
-        } catch (Exception ignored) {
-            // fall through
-        }
-        try {
-            return OffsetDateTime.parse(value).toInstant();
-        } catch (Exception ignored) {
-            // fall through
-        }
-        try {
-            return LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toInstant();
         } catch (Exception ignored) {
             return null;
         }

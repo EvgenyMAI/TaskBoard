@@ -79,7 +79,9 @@ services:
         condition: service_healthy
 
   tasks-service:
-    build: ./tasks-service
+    build:
+      context: .
+      dockerfile: tasks-service/Dockerfile
     ports:
       - "${TASKS_SERVICE_PORT:-8082}:8082"
     volumes:
@@ -106,7 +108,9 @@ services:
         condition: service_started
 
   analytics-service:
-    build: ./analytics-service
+    build:
+      context: .
+      dockerfile: analytics-service/Dockerfile
     ports:
       - "${ANALYTICS_SERVICE_PORT:-8083}:8083"
     volumes:
