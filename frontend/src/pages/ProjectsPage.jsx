@@ -1,10 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
-import Modal from '../components/Modal';
-import FormField from '../components/FormField';
-import Skeleton from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
 import {
@@ -13,6 +9,9 @@ import {
   updateProject,
   deleteProject,
 } from '../api';
+import ProjectsPageHeader from '../components/projects/ProjectsPageHeader';
+import ProjectsListSection from '../components/projects/ProjectsListSection';
+import ProjectFormModal from '../components/projects/ProjectFormModal';
 
 export default function ProjectsPage() {
   const toast = useToast();
@@ -24,7 +23,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // null | 'create' | { type: 'edit', project }
+  const [modal, setModal] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -112,126 +111,40 @@ export default function ProjectsPage() {
   return (
     <Layout>
       <div className="container page-width projects-page">
-        <header className="card profile-hero projects-hero">
-          <div className="profile-hero-main">
-            <div className="profile-avatar profile-avatar-projects" aria-hidden="true">{heroLetter}</div>
-            <div className="profile-hero-text">
-              <h1>Проекты</h1>
-              <div className="profile-hero-line">
-                <p className="profile-hero-sub">
-                  {username
-                    ? `Ваши проекты, ${username}`
-                    : 'Задачи сгруппированы по проектам — откройте нужный'}
-                </p>
-                <div className="profile-role-chips" aria-live="polite">
-                  <span className="profile-chip-metric">
-                    {loading ? 'Загрузка…' : `Проектов: ${projects.length}`}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="profile-hero-hint profile-hero-hint-row">
-            <p className="muted small profile-hero-hint-text">
-              {isAdminOrManager
-                ? 'Создайте проект и пригласите команду — всё настраивается в карточке проекта.'
-                : 'Откройте проект, в котором вы участник, чтобы увидеть задачи.'}
-            </p>
-            {isAdminOrManager && (
-              <button type="button" onClick={openCreate}>
-                + Создать проект
-              </button>
-            )}
-          </div>
-        </header>
+        <ProjectsPageHeader
+          heroLetter={heroLetter}
+          username={username}
+          loading={loading}
+          projectsCount={projects.length}
+          isAdminOrManager={isAdminOrManager}
+          onCreateClick={openCreate}
+        />
 
         {error && <p className="error projects-global-error">{error}</p>}
 
-        <section className="card profile-section" aria-labelledby="projects-list-heading">
-          <div className="profile-section-head">
-            <span className="profile-section-icon" aria-hidden="true">◆</span>
-            <h2 id="projects-list-heading">Список проектов</h2>
-          </div>
-          {loading ? (
-            <ul className="projects-card-list">
-              <li className="card projects-card-item-skeleton"><Skeleton style={{ height: 72 }} /></li>
-              <li className="card projects-card-item-skeleton"><Skeleton style={{ height: 72 }} /></li>
-              <li className="card projects-card-item-skeleton"><Skeleton style={{ height: 72 }} /></li>
-            </ul>
-          ) : projects.length === 0 ? (
-            <p className="muted projects-empty">
-              {isAdminOrManager
-                ? 'Нет проектов. Создайте первый проект.'
-                : 'Нет проектов, где вы участник. Администратор может добавить вас в состав проекта.'}
-            </p>
-          ) : (
-            <ul className="projects-card-list">
-              {projects.map((p) => (
-                <li key={p.id} className="card projects-card-item">
-                  <div className="projects-card-item-main">
-                    <Link to={`/projects/${p.id}`} className="projects-card-title">
-                      {p.name}
-                    </Link>
-                    {p.description && <p className="muted small projects-card-desc">{p.description}</p>}
-                  </div>
-                  <div className="projects-card-actions">
-                    <Link to={`/projects/${p.id}`} className="btn-link">
-                      Открыть →
-                    </Link>
-                    {isAdminOrManager && (
-                      <>
-                        <button type="button" className="secondary small" onClick={() => openEdit(p)}>
-                          Изменить
-                        </button>
-                        <button type="button" className="danger small" onClick={() => handleDelete(p)}>
-                          Удалить
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <ProjectsListSection
+          loading={loading}
+          projects={projects}
+          isAdminOrManager={isAdminOrManager}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+        />
       </div>
 
-      {modal && (
-        <Modal
-          title={modal === 'create' ? 'Новый проект' : 'Редактировать проект'}
-          onClose={closeModal}
-        >
-            <form onSubmit={handleSubmit}>
-              <FormField label="Название" error={touched && nameError ? nameError : ''}>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onBlur={() => setTouched(true)}
-                  className={touched && nameError ? 'input-invalid' : ''}
-                  required
-                  autoFocus
-                />
-              </FormField>
-              <FormField label="Описание">
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                />
-              </FormField>
-              {error && <p className="error">{error}</p>}
-              <div className="form-actions">
-                <button type="button" className="secondary" onClick={closeModal}>
-                  Отмена
-                </button>
-                <button type="submit" disabled={submitLoading || Boolean(nameError)}>
-                  {submitLoading ? 'Сохранение...' : modal === 'create' ? 'Создать' : 'Сохранить'}
-                </button>
-              </div>
-            </form>
-        </Modal>
-      )}
+      <ProjectFormModal
+        modal={modal}
+        name={name}
+        description={description}
+        nameError={nameError}
+        touched={touched}
+        submitLoading={submitLoading}
+        error={error}
+        onClose={closeModal}
+        onSubmit={handleSubmit}
+        onNameChange={setName}
+        onDescriptionChange={setDescription}
+        onNameBlur={() => setTouched(true)}
+      />
     </Layout>
   );
 }

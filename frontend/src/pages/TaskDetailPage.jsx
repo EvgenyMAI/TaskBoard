@@ -30,6 +30,11 @@ import TaskCommentsPanel from '../components/task-detail/TaskCommentsPanel';
 import TaskAttachmentsPanel from '../components/task-detail/TaskAttachmentsPanel';
 import TaskHistoryPanel from '../components/task-detail/TaskHistoryPanel';
 import TaskAttachmentViewerModal, { EMPTY_VIEWER } from '../components/task-detail/TaskAttachmentViewerModal';
+import TaskDetailBreadcrumb from '../components/task-detail/TaskDetailBreadcrumb';
+import TaskDetailHero from '../components/task-detail/TaskDetailHero';
+import TaskDetailEditForm from '../components/task-detail/TaskDetailEditForm';
+import TaskDetailSummary from '../components/task-detail/TaskDetailSummary';
+import TaskDetailTabList from '../components/task-detail/TaskDetailTabList';
 
 export default function TaskDetailPage() {
   const { id } = useParams();
@@ -380,229 +385,52 @@ export default function TaskDetailPage() {
   return (
     <Layout>
       <div className="container page-width task-detail-page">
-        <nav className="breadcrumb task-breadcrumb" aria-label="Навигация">
-          <Link to="/tasks">Задачи</Link>
-          {task.projectId && (
-            <>
-              <span className="sep">/</span>
-              <Link to={`/projects/${task.projectId}`}>{projectName(task.projectId)}</Link>
-            </>
-          )}
-          <span className="sep">/</span>
-          <span className="breadcrumb-current">{task.title}</span>
-        </nav>
+        <TaskDetailBreadcrumb task={task} projectName={projectName} />
 
-        <header className="card profile-hero task-detail-hero">
-          <div className="profile-hero-main">
-            <div className="profile-avatar profile-avatar-task-detail" aria-hidden="true">{heroLetter}</div>
-            <div className="profile-hero-text">
-              <h1 className="task-detail-title">{task.title}</h1>
-              <div className="profile-hero-line">
-                <p className="profile-hero-sub">
-                  {task.projectId ? (
-                    <>
-                      В проекте:{' '}
-                      <Link to={`/projects/${task.projectId}`}>{projectName(task.projectId)}</Link>
-                    </>
-                  ) : (
-                    'Задача без привязки к проекту'
-                  )}
-                </p>
-                <div className="profile-role-chips">
-                  <span className={`badge badge-${(task.status || '').toLowerCase()} task-detail-status-chip`}>
-                    {STATUS_LABELS[task.status] || task.status}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="profile-hero-hint profile-hero-hint-row">
-            <p className="muted small profile-hero-hint-text">
-              Создана: {formatDateTimeRu(task.createdAt)} · Обновлена: {formatDateTimeRu(task.updatedAt)}
-            </p>
-            <div className="task-detail-hero-actions">
-              {!editing ? (
-                <>
-                  {canEditTask && (
-                    <button type="button" onClick={() => setEditing(true)}>
-                      Редактировать
-                    </button>
-                  )}
-                  {canDeleteTask && (
-                    <button type="button" className="danger" onClick={handleDeleteTask}>
-                      Удалить
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => setEditing(false)}>
-                  Отмена
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
+        <TaskDetailHero
+          task={task}
+          heroLetter={heroLetter}
+          projectName={projectName}
+          editing={editing}
+          canEditTask={canEditTask}
+          canDeleteTask={canDeleteTask}
+          onEdit={() => setEditing(true)}
+          onCancelEdit={() => setEditing(false)}
+          onDelete={handleDeleteTask}
+        />
 
         {error && <p className="error task-detail-global-error">{error}</p>}
 
         {editing && canEditTask ? (
-          <section className="card profile-section" aria-labelledby="task-edit-heading">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="task-edit-heading">Редактирование</h2>
-            </div>
-            <form onSubmit={handleSaveTask}>
-              <div className="form-group">
-                <label htmlFor="task-edit-title">Название</label>
-                <input
-                  id="task-edit-title"
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="task-edit-desc">Описание</label>
-                <textarea
-                  id="task-edit-desc"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Статус</label>
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                    {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label htmlFor="task-edit-assignee">Исполнитель</label>
-                  {isAdminOrManager ? (
-                    <select
-                      id="task-edit-assignee"
-                      value={editAssigneeId}
-                      onChange={(e) => setEditAssigneeId(e.target.value)}
-                    >
-                      <option value="">— не назначен —</option>
-                      {assigneeSelectUserIds.map((uid) => {
-                        const u = users.find((x) => x.id === uid);
-                        if (!u) return null;
-                        const notInProject = !projectMemberIds.includes(uid);
-                        const label = notInProject ? `${u.username} (нет в проекте)` : u.username;
-                        return (
-                          <option key={uid} value={String(uid)}>{label}</option>
-                        );
-                      })}
-                    </select>
-                  ) : (
-                    <select id="task-edit-assignee" value={editAssigneeId} disabled aria-readonly="true">
-                      {editAssigneeId ? (
-                        <option value={String(editAssigneeId)}>
-                          {users.find((x) => String(x.id) === String(editAssigneeId))?.username
-                            || `Пользователь #${editAssigneeId}`}
-                        </option>
-                      ) : (
-                        <option value="">— не назначен —</option>
-                      )}
-                    </select>
-                  )}
-                  {isAdminOrManager && (
-                    <p className="muted small" style={{ marginTop: '0.35rem' }}>
-                      Только участники проекта; иначе сначала добавьте пользователя в проект.
-                    </p>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Срок</label>
-                  <input
-                    type="datetime-local"
-                    value={editDueDate}
-                    onChange={(e) => setEditDueDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="form-actions">
-                <button type="button" className="secondary" onClick={() => setEditing(false)}>
-                  Отмена
-                </button>
-                <button type="submit" disabled={submitLoading}>
-                  {submitLoading ? 'Сохранение...' : 'Сохранить'}
-                </button>
-              </div>
-            </form>
-          </section>
+          <TaskDetailEditForm
+            editTitle={editTitle}
+            setEditTitle={setEditTitle}
+            editDescription={editDescription}
+            setEditDescription={setEditDescription}
+            editStatus={editStatus}
+            setEditStatus={setEditStatus}
+            editAssigneeId={editAssigneeId}
+            setEditAssigneeId={setEditAssigneeId}
+            editDueDate={editDueDate}
+            setEditDueDate={setEditDueDate}
+            assigneeSelectUserIds={assigneeSelectUserIds}
+            users={users}
+            projectMemberIds={projectMemberIds}
+            isAdminOrManager={isAdminOrManager}
+            submitLoading={submitLoading}
+            onSubmit={handleSaveTask}
+            onCancel={() => setEditing(false)}
+          />
         ) : (
-          <section className="card profile-section" aria-labelledby="task-summary-heading">
-            <div className="profile-section-head">
-              <span className="profile-section-icon" aria-hidden="true">◆</span>
-              <h2 id="task-summary-heading">Сводка</h2>
-            </div>
-            <div className="task-detail-summary">
-              <div className="task-summary-row">
-                <span className="task-summary-label">Статус</span>
-                <span className={`badge badge-${(task.status || '').toLowerCase()} task-summary-badge`}>
-                  {STATUS_LABELS[task.status] || task.status}
-                </span>
-              </div>
-
-              {task.description && (
-                <div className="task-summary-row">
-                  <span className="task-summary-label">Описание</span>
-                  <span className="task-detail-description">{task.description}</span>
-                </div>
-              )}
-
-              {task.assigneeId && (
-                <div className="task-summary-row">
-                  <span className="task-summary-label">Исполнитель</span>
-                  <span className="task-summary-value">{userName(task.assigneeId)}</span>
-                </div>
-              )}
-
-              {task.dueDate && (
-                <div className="task-summary-row">
-                  <span className="task-summary-label">Срок</span>
-                  <span className="task-summary-value">{formatDateTimeRu(task.dueDate)}</span>
-                </div>
-              )}
-            </div>
-          </section>
+          <TaskDetailSummary task={task} userName={userName} />
         )}
 
-        <div className="analytics-segmented task-detail-tabs" role="tablist" aria-label="Разделы карточки">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'comments'}
-            className={activeTab === 'comments' ? 'is-active' : ''}
-            onClick={() => setActiveTab('comments')}
-          >
-            Комментарии ({comments.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'attachments'}
-            className={activeTab === 'attachments' ? 'is-active' : ''}
-            onClick={() => setActiveTab('attachments')}
-          >
-            Вложения ({attachments.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'history'}
-            className={activeTab === 'history' ? 'is-active' : ''}
-            onClick={() => setActiveTab('history')}
-          >
-            История
-          </button>
-        </div>
+        <TaskDetailTabList
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          commentsCount={comments.length}
+          attachmentsCount={attachments.length}
+        />
 
         {activeTab === 'comments' && (
           <TaskCommentsPanel
