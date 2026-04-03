@@ -29,12 +29,18 @@ export default function ProjectsListSection({
       ) : (
         <ul className="projects-card-list">
           {projects.map((p) => (
-            <li key={p.id} className="card projects-card-item">
-              <div className="projects-card-item-main">
-                <Link to={`/projects/${p.id}`} className="projects-card-title">
-                  {p.name}
-                </Link>
-                {p.description && <p className="muted small projects-card-desc">{p.description}</p>}
+            <li key={p.id} className="card task-list-item projects-card-item">
+              <div className="task-item-content">
+                <div className="task-item-header">
+                  <Link to={`/projects/${p.id}`} className="task-title">
+                    {p.name}
+                  </Link>
+                </div>
+                {p.description ? (
+                  <div className="task-item-meta">
+                    <span className="meta-chip meta-chip--block">{p.description}</span>
+                  </div>
+                ) : null}
               </div>
               <div className="projects-card-actions">
                 <Link to={`/projects/${p.id}`} className="btn-link">

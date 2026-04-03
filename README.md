@@ -410,14 +410,3 @@ LOG_LEVEL=INFO
 ### 9.5 CI/CD (GitHub Actions)
 
 Файл **`.github/workflows/ci.yml`**: на `push` и `pull_request` — backend-тесты (`auth-service`; из корня `mvn … -pl tasks-service,analytics-service -am test`), затем e2e с поднятым compose и Playwright.
-
-### 9.6 Инфраструктура и сборка после выделения модулей и последующих исправлений
-
-Кратко, что изменилось по сравнению с ранним коммитом вроде «extract application services…» (и связанным рефакторингом):
-
-- **Maven:** корневой **`pom.xml`** — reactor **`taskboard-common`**, **`tasks-service`**, **`analytics-service`**; **`auth-service`** остаётся отдельным модулем со своим `pom.xml`.
-- **Общий код:** модуль **`taskboard-common`** — разбор и проверка JWT для resource-server’ов задач и аналитики.
-- **Docker:** сборка **`tasks-service`** и **`analytics-service`** с **контекстом корня** репозитория; в Dockerfile пути **`COPY …/src` → `…/src`**, чтобы в образе сохранялась структура **`src/main/java`** (иначе fat-JAR собирался без классов приложения).
-- **Проверка артефакта:** после `package` в Dockerfile выполняется проверка наличия главного класса внутри JAR (`jar tf` + `grep -F`).
-- **CORS:** в **`SecurityConfig`** сервисов задач и аналитики включены **`CorsConfigurationSource`** и **`http.cors(...)`**, чтобы браузерные preflight-запросы к REST стабильно проходили вместе с Spring Security.
-- **Скрипты:** **`run-tests.ps1`** — корректный вызов `docker` и код выхода, нормализация путей bind-mount, отсутствие `2>&1` в аргументах `mvn` внутри контейнера, временный env-файл для e2e вместо «залипания» портов в shell; **`scripts/clean-dev.ps1`** — очистка артефактов; **`docker.defaults.env`** — явные порты для compose.

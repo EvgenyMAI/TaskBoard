@@ -217,6 +217,13 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   line-height: 1.3;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
+/* Длинный текст (описание проекта) — те же шрифт и чип, что у мета-строки задачи */
+.meta-chip--block {
+  white-space: normal;
+  max-width: 100%;
+  border-radius: 10px;
+  text-align: left;
+}
 .badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
@@ -732,6 +739,9 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   transform: translateY(-2px);
   box-shadow: 0 10px 28px rgba(99, 102, 241, 0.12);
 }
+.dashboard-project-card:hover .dashboard-project-card-title {
+  color: #c4b5fd;
+}
 .dashboard-project-card-glow {
   position: absolute;
   top: -40%;
@@ -745,18 +755,22 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 .dashboard-project-card-title {
   position: relative;
   margin: 0 0 0.35rem;
-  font-weight: 700;
-  font-size: 1.02rem;
-  color: #f4f4f5;
+  font-weight: 500;
+  font-size: 1rem;
+  color: #a78bfa;
+  transition: color 0.15s ease;
 }
 .dashboard-project-card-desc {
   position: relative;
   margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #e8eaef;
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.4;
 }
 
 .dashboard-stats {
@@ -1767,36 +1781,20 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+}
+.projects-page .projects-card-list > .card {
+  margin-bottom: 0.75rem;
+}
+.projects-page .projects-card-list > .card:last-child {
+  margin-bottom: 0;
 }
 .projects-card-item {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
-  border-color: rgba(167, 139, 250, 0.12);
-  background: rgba(255, 255, 255, 0.02);
   margin: 0;
-}
-.projects-card-item-main {
-  flex: 1;
-  min-width: 0;
-}
-.projects-card-title {
-  font-weight: 600;
-  color: #e4e4e7;
-  text-decoration: none;
-  font-size: 1.05rem;
-}
-.projects-card-title:hover {
-  color: #a78bfa;
-}
-.projects-card-desc {
-  margin: 0.35rem 0 0;
-  line-height: 1.4;
 }
 .projects-card-actions {
   display: flex;
@@ -1805,7 +1803,10 @@ h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
   align-items: center;
 }
 .projects-card-item-skeleton.card {
-  margin: 0;
+  margin-bottom: 0.75rem;
+}
+.projects-card-item-skeleton.card:last-child {
+  margin-bottom: 0;
 }
 
 .project-detail-page .project-detail-global-error {

@@ -24,7 +24,7 @@ export default function DashboardRecentProjectsSection({ loading, projects }) {
             <Link key={p.id} to={`/projects/${p.id}`} className="dashboard-project-card">
               <span className="dashboard-project-card-glow" aria-hidden="true" />
               <p className="dashboard-project-card-title">{p.name}</p>
-              <p className="dashboard-project-card-desc muted small">
+              <p className="dashboard-project-card-desc">
                 {p.description?.trim() || 'Без описания'}
               </p>
             </Link>
