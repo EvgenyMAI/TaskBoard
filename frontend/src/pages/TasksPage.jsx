@@ -11,21 +11,8 @@ import {
   createTask,
   getProjectMembers,
 } from '../api';
-
-const STATUS_LABELS = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'На проверке',
-  DONE: 'Выполнена',
-  CANCELLED: 'Отменена',
-};
-
-function formatDueDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('ru-RU');
-}
+import { STATUS_LABELS } from '../constants/taskStatus';
+import { formatDueDateShort } from '../utils/dateFormat';
 
 export default function TasksPage() {
   const [searchParams] = useSearchParams();
@@ -352,7 +339,7 @@ export default function TasksPage() {
                     <div className="task-item-meta">
                       <span className="meta-chip">Проект: {t.projectId ? projectById(t.projectId) : '—'}</span>
                       <span className="meta-chip">Исполнитель: {t.assigneeId ? userById(t.assigneeId) : '—'}</span>
-                      <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
+                      <span className="meta-chip">Срок: {formatDueDateShort(t.dueDate)}</span>
                     </div>
                   </div>
                   <Link to={`/tasks/${t.id}`} className="btn-link">

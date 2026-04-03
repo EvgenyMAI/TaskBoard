@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import Skeleton from '../components/Skeleton';
 import { Link } from 'react-router-dom';
 import { getReportSummary, getReportByProject, getReportByAssignee, downloadReportCsv } from '../api';
+import { STATUS_LABELS } from '../constants/taskStatus';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -98,13 +99,6 @@ export default function AnalyticsPage() {
   const comparison = summary?.periodComparison || null;
   const maxProject = Math.max(1, ...byProject.map((x) => num(x.count)));
   const maxAssignee = Math.max(1, ...byAssignee.map((x) => num(x.count)));
-  const statusLabels = {
-    OPEN: 'Открыта',
-    IN_PROGRESS: 'В работе',
-    REVIEW: 'На проверке',
-    DONE: 'Выполнена',
-    CANCELLED: 'Отменена',
-  };
   const statusPalette = {
     OPEN: '#8b5cf6',
     IN_PROGRESS: '#06b6d4',
@@ -340,7 +334,7 @@ export default function AnalyticsPage() {
                           style={{ backgroundColor: statusPalette[k] || '#8b5cf6' }}
                           aria-hidden="true"
                         />
-                        <span className="analytics-status-name">{statusLabels[k] || k}</span>
+                        <span className="analytics-status-name">{STATUS_LABELS[k] || k}</span>
                       </div>
                       <div className="analytics-status-metrics" aria-label={`${num(v)} задач, ${pct}%`}>
                         <span className="analytics-status-count">{num(v)}</span>
@@ -388,7 +382,7 @@ export default function AnalyticsPage() {
                             style={{ backgroundColor: statusPalette[k] || '#8b5cf6' }}
                             aria-hidden="true"
                           />
-                          <span className="analytics-status-name">{statusLabels[k] || k}</span>
+                          <span className="analytics-status-name">{STATUS_LABELS[k] || k}</span>
                         </div>
                         <div className="analytics-status-metrics" aria-label={`${num(v)} задач, ${pct}%`}>
                           <span className="analytics-status-count">{num(v)}</span>

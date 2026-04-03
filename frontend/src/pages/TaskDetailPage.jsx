@@ -22,32 +22,18 @@ import {
   getUsers,
   getProjectMembers,
 } from '../api';
-
-const STATUS_LABELS = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'На проверке',
-  DONE: 'Выполнена',
-  CANCELLED: 'Отменена',
-};
-
-const HISTORY_FIELD_LABELS = {
-  title: 'Название',
-  description: 'Описание',
-  status: 'Статус',
-  assigneeId: 'Исполнитель',
-  dueDate: 'Срок',
-};
-
-function formatDate(s) {
-  if (!s) return '—';
-  try {
-    const d = new Date(s);
-    return d.toLocaleString('ru-RU');
-  } catch {
-    return String(s);
-  }
-}
+import { STATUS_LABELS } from '../constants/taskStatus';
+import { HISTORY_FIELD_LABELS } from '../constants/taskHistoryFields';
+import { formatDateTimeRu } from '../utils/dateFormat';
+import { formatTaskHistoryFieldValue } from '../utils/taskHistoryFormat';
+import {
+  isImageMime,
+  isPreviewableMime,
+  isTextPreviewableMime,
+  attachmentFileKind,
+  formatFileSizeBytes,
+} from '../utils/attachmentKind';
+import AttachmentFileTypeIcon from '../components/task-detail/AttachmentFileTypeIcon';
 
 export default function TaskDetailPage() {
   const { id } = useParams();
@@ -141,16 +127,8 @@ export default function TaskDetailPage() {
   const projectName = (pid) => projects.find((p) => p.id === pid)?.name || `#${pid}`;
   const userName = (uid) => users.find((u) => u.id === uid)?.username || `#${uid}`;
 
-  const formatHistoryValue = (fieldName, raw) => {
-    if (raw == null || raw === '') return '—';
-    if (fieldName === 'status') return STATUS_LABELS[raw] || raw;
-    if (fieldName === 'assigneeId') {
-      const id = Number(raw);
-      return Number.isFinite(id) ? userName(id) : String(raw);
-    }
-    if (fieldName === 'dueDate') return formatDate(raw);
-    return String(raw);
-  };
+  const formatHistoryValue = (fieldName, raw) =>
+    formatTaskHistoryFieldValue(fieldName, raw, { statusLabels: STATUS_LABELS, userName });
 
   const historyFieldTitle = (fieldName) => HISTORY_FIELD_LABELS[fieldName] || fieldName;
   const currentUserId = user?.userId;
@@ -281,37 +259,10 @@ export default function TaskDetailPage() {
       });
   };
 
-  const isImage = (mime) => Boolean(mime && mime.toLowerCase().startsWith('image/'));
-  const isTextPreviewable = (mime = '') => {
-    const m = String(mime).toLowerCase();
-    return m.startsWith('text/') || ['application/json', 'application/xml', 'application/csv'].includes(m);
-  };
-  const isPreviewable = (mime = '') => {
-    const m = String(mime).toLowerCase();
-    return m.startsWith('image/') || isTextPreviewable(m);
-  };
-  const fileType = (name = '', mime = '') => {
-    const lower = String(name).toLowerCase();
-    if (isImage(mime)) return 'image';
-    if (mime.includes('pdf') || lower.endsWith('.pdf')) return 'pdf';
-    if (mime.includes('word') || lower.endsWith('.doc') || lower.endsWith('.docx')) return 'doc';
-    if (mime.includes('excel') || lower.endsWith('.xls') || lower.endsWith('.xlsx')) return 'sheet';
-    if (mime.includes('presentation') || lower.endsWith('.ppt') || lower.endsWith('.pptx')) return 'slides';
-    if (mime.startsWith('text/') || lower.endsWith('.txt') || lower.endsWith('.md')) return 'text';
-    if (lower.endsWith('.zip') || lower.endsWith('.rar') || lower.endsWith('.7z')) return 'archive';
-    return 'file';
-  };
-  const formatBytes = (size) => {
-    if (!size || size < 0) return '—';
-    if (size < 1024) return `${size} B`;
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   useEffect(() => {
     let cancelled = false;
     const revokeUrls = [];
-    const imageAttachments = attachments.filter((a) => isImage(a.mimeType));
+    const imageAttachments = attachments.filter((a) => isImageMime(a.mimeType));
     if (!imageAttachments.length) {
       setAttachmentThumbs({});
       return undefined;
@@ -354,7 +305,7 @@ export default function TaskDetailPage() {
   };
 
   const handleOpenAttachment = async (a) => {
-    if (!isPreviewable(a.mimeType)) {
+    if (!isPreviewableMime(a.mimeType)) {
       toast.info('Для этого типа файла доступно только скачивание');
       return;
     }
@@ -362,7 +313,7 @@ export default function TaskDetailPage() {
       const { blob } = await getAttachmentBlob(id, a.id, { preview: true });
       const objectUrl = URL.createObjectURL(blob);
       const mime = (a.mimeType || '').toLowerCase();
-      if (isTextPreviewable(mime)) {
+      if (isTextPreviewableMime(mime)) {
         const text = await blob.text();
         setViewer((prev) => {
           if (prev.url) URL.revokeObjectURL(prev.url);
@@ -401,28 +352,6 @@ export default function TaskDetailPage() {
     } catch (e) {
       toast.error(e.message || 'Не удалось скачать файл');
     }
-  };
-
-  const FileTypeIcon = ({ type }) => {
-    const colors = {
-      image: '#8b5cf6',
-      pdf: '#ef4444',
-      doc: '#2563eb',
-      sheet: '#16a34a',
-      slides: '#ea580c',
-      text: '#64748b',
-      archive: '#7c3aed',
-      file: '#0f766e',
-    };
-    const c = colors[type] || colors.file;
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ marginRight: 6, verticalAlign: 'text-bottom' }}>
-        <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke={c} strokeWidth="1.8" />
-        <path d="M14 3v5h5" stroke={c} strokeWidth="1.8" />
-        <rect x="8" y="12" width="8" height="1.8" rx="0.9" fill={c} />
-        <rect x="8" y="16" width="6" height="1.8" rx="0.9" fill={c} />
-      </svg>
-    );
   };
 
   if (loading && !task) {
@@ -493,7 +422,7 @@ export default function TaskDetailPage() {
           </div>
           <div className="profile-hero-hint profile-hero-hint-row">
             <p className="muted small profile-hero-hint-text">
-              Создана: {formatDate(task.createdAt)} · Обновлена: {formatDate(task.updatedAt)}
+              Создана: {formatDateTimeRu(task.createdAt)} · Обновлена: {formatDateTimeRu(task.updatedAt)}
             </p>
             <div className="task-detail-hero-actions">
               {!editing ? (
@@ -642,7 +571,7 @@ export default function TaskDetailPage() {
               {task.dueDate && (
                 <div className="task-summary-row">
                   <span className="task-summary-label">Срок</span>
-                  <span className="task-summary-value">{formatDate(task.dueDate)}</span>
+                  <span className="task-summary-value">{formatDateTimeRu(task.dueDate)}</span>
                 </div>
               )}
             </div>
@@ -721,7 +650,7 @@ export default function TaskDetailPage() {
                             <div className="task-comment-card-meta">
                               <span className="task-comment-author">{un}</span>
                               <time className="muted small task-comment-time" dateTime={c.createdAt}>
-                                {formatDate(c.createdAt)}
+                                {formatDateTimeRu(c.createdAt)}
                               </time>
                             </div>
                             {(isAdminOrManager || c.authorId === currentUserId) && (
@@ -785,14 +714,14 @@ export default function TaskDetailPage() {
                       <li key={a.id} className="task-attachment-card">
                         <div className="task-attachment-card-main">
                           <div className="task-attachment-card-title-row">
-                            <FileTypeIcon type={fileType(a.fileName, a.mimeType)} />
+                            <AttachmentFileTypeIcon type={attachmentFileKind(a.fileName, a.mimeType)} />
                             <strong className="task-attachment-name">{displayName(a)}</strong>
                           </div>
                           <p className="muted small task-attachment-meta-line">
-                            {a.mimeType || 'application/octet-stream'} · {formatBytes(a.fileSize)}
+                            {a.mimeType || 'application/octet-stream'} · {formatFileSizeBytes(a.fileSize)}
                           </p>
                           <div className="task-attachment-actions">
-                            {isPreviewable(a.mimeType) && (
+                            {isPreviewableMime(a.mimeType) && (
                               <button type="button" className="secondary small" onClick={() => handleOpenAttachment(a)}>
                                 Открыть
                               </button>
@@ -806,7 +735,7 @@ export default function TaskDetailPage() {
                               </button>
                             )}
                           </div>
-                          {isImage(a.mimeType) && (
+                          {isImageMime(a.mimeType) && (
                             <div className="task-attachment-thumb-wrap">
                               {attachmentThumbs[a.id] ? (
                                 <button
@@ -855,7 +784,7 @@ export default function TaskDetailPage() {
                       <div className="task-history-card-head">
                         <span className="task-history-field-chip">{historyFieldTitle(h.fieldName)}</span>
                         <span className="muted small task-history-when">
-                          {userName(h.changedBy)} · {formatDate(h.changedAt)}
+                          {userName(h.changedBy)} · {formatDateTimeRu(h.changedAt)}
                         </span>
                       </div>
                       <div className="task-history-diff" aria-label="Было и стало">

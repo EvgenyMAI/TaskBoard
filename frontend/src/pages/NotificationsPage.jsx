@@ -4,21 +4,14 @@ import { ANALYTICS_API, getToken, getNotifications, markNotificationRead } from 
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Skeleton from '../components/Skeleton';
-
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('ru-RU');
-  } catch {
-    return String(value);
-  }
-}
+import { STATUS_LABELS } from '../constants/taskStatus';
+import { formatDateTimeRu } from '../utils/dateFormat';
 
 function formatRelativeTime(value) {
   if (!value) return '';
   const d = new Date(value);
   const diff = Date.now() - d.getTime();
-  if (diff < 0) return formatDate(value);
+  if (diff < 0) return formatDateTimeRu(value);
   const sec = Math.floor(diff / 1000);
   if (sec < 45) return 'только что';
   const min = Math.floor(sec / 60);
@@ -27,7 +20,7 @@ function formatRelativeTime(value) {
   if (h < 24) return `${h} ч назад`;
   const days = Math.floor(h / 24);
   if (days < 7) return `${days} дн. назад`;
-  return formatDate(value);
+  return formatDateTimeRu(value);
 }
 
 const TYPE_LABELS = {
@@ -35,14 +28,6 @@ const TYPE_LABELS = {
   TASK_ASSIGNED: 'Назначение',
   TASK_REASSIGNED: 'Переназначение',
   TASK_STATUS_CHANGED: 'Смена статуса',
-};
-
-const STATUS_LABELS = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'На проверке',
-  DONE: 'Выполнена',
-  CANCELLED: 'Отменена',
 };
 
 function taskTitleFromBody(body) {
@@ -328,7 +313,7 @@ export default function NotificationsPage() {
                       ) : null}
                       <p className="notification-body-full">{n.body || '—'}</p>
                       <div className="notification-meta notification-meta-full">
-                        <span className="meta-chip">{formatDate(n.createdAt)}</span>
+                        <span className="meta-chip">{formatDateTimeRu(n.createdAt)}</span>
                       </div>
                     </div>
                   )}

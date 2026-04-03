@@ -15,23 +15,10 @@ import {
   addProjectMember,
   removeProjectMember,
 } from '../api';
-
-const STATUS_LABELS = {
-  OPEN: 'Открыта',
-  IN_PROGRESS: 'В работе',
-  REVIEW: 'На проверке',
-  DONE: 'Выполнена',
-  CANCELLED: 'Отменена',
-};
+import { STATUS_LABELS } from '../constants/taskStatus';
+import { formatDueDateShort } from '../utils/dateFormat';
 
 const PROJECT_MEMBERS_PAGE_SIZE = 12;
-
-function formatDueDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('ru-RU');
-}
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -613,7 +600,7 @@ export default function ProjectDetailPage() {
                     </div>
                     <div className="task-item-meta">
                       <span className="meta-chip">Исполнитель: {t.assigneeId ? userName(t.assigneeId) : '—'}</span>
-                      <span className="meta-chip">Срок: {formatDueDate(t.dueDate)}</span>
+                      <span className="meta-chip">Срок: {formatDueDateShort(t.dueDate)}</span>
                     </div>
                   </div>
                   <Link to={`/tasks/${t.id}`} className="btn-link">
