@@ -20,6 +20,14 @@
 
 Система развернута как набор отдельных сервисов и БД в Docker.
 
+### 1.1 Где смотреть документацию
+
+- Техническая навигация по папке `docs`: `docs/README.md`
+- Отчетный документ ВКР: `docs/report-vkr.md`
+- Архитектурная схема: `docs/diagrams/architecture/architecture.png`
+- ER-диаграммы БД: `docs/diagrams/er/er-auth.png`, `docs/diagrams/er/er-tasks.png`, `docs/diagrams/er/er-analytics.png`
+- Проверка API: `docs/api.http` и `docs/curl-checks.md`
+
 ---
 
 ## 2. Технологии
@@ -57,17 +65,27 @@
 
 ### 3.1 Визуальная схема архитектуры
 
-- Схема: `docs/architecture.png`
-- Исходник схемы: `docs/architecture.mmd`
-- Скрипт генерации PNG: `docs/generate-architecture.ps1`
+- Схема: `docs/diagrams/architecture/architecture.png`
+- Исходник схемы: `docs/diagrams/architecture/architecture.mmd`
+- Скрипт генерации PNG: `docs/scripts/generate-architecture.ps1`
 
 Команда генерации:
 
 ```powershell
-.\docs\generate-architecture.ps1
+.\docs\scripts\generate-architecture.ps1
 ```
 
-Схема: [TaskBoard architecture](docs/architecture.png)
+Схема: [Архитектура TaskBoard](docs/diagrams/architecture/architecture.png)
+
+### 3.2 ER-диаграммы баз данных
+
+ER-диаграммы поддерживаются отдельно для каждой базы данных микросервисов:
+
+- `docs/diagrams/er/er-auth.png` — структура БД `taskboard_auth`;
+- `docs/diagrams/er/er-tasks.png` — структура БД `taskboard_tasks`;
+- `docs/diagrams/er/er-analytics.png` — структура БД `taskboard_analytics`.
+
+Такое разбиение соответствует микросервисным границам и облегчает чтение схем.
 
 ---
 

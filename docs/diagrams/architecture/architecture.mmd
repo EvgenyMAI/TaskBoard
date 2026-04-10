@@ -1,0 +1,53 @@
+flowchart TB
+    U[User]
+
+    subgraph FRONTEND[Frontend layer]
+        FE[React app + Vite tooling<br/>localhost:3000]
+    end
+
+    subgraph BACKEND[Backend layer]
+        direction TB
+        API[Backend REST API]
+        subgraph SERVICES[Services]
+            direction LR
+            AUTH[auth-service<br/>localhost:8081]
+            TASKS[tasks-service<br/>localhost:8082]
+            ANALYTICS[analytics-service<br/>localhost:8083]
+        end
+        COMMON[[taskboard-common<br/>shared JWT parser]]
+    end
+
+    subgraph DATA[Data layer]
+        direction LR
+        DBA[(PostgreSQL<br/>taskboard_auth)]
+        DBT[(PostgreSQL<br/>taskboard_tasks)]
+        DBN[(PostgreSQL<br/>taskboard_analytics)]
+        MINIO[(MinIO<br/>taskboard-attachments)]
+    end
+
+    U --> FE
+    FE --> API
+    API --> AUTH
+    API --> TASKS
+    API --> ANALYTICS
+
+    AUTH --> DBA
+    TASKS --> DBT
+    ANALYTICS --> DBN
+    TASKS --> MINIO
+
+    TASKS --> ANALYTICS
+    COMMON -.-> TASKS
+    COMMON -.-> ANALYTICS
+
+    classDef user fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#0F172A;
+    classDef frontend fill:#E0F2FE,stroke:#0284C7,stroke-width:2px,color:#0F172A;
+    classDef service fill:#ECFDF5,stroke:#16A34A,stroke-width:2px,color:#0F172A;
+    classDef db fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#0F172A;
+    classDef shared fill:#F5F3FF,stroke:#7C3AED,stroke-width:2px,color:#0F172A;
+
+    class U user;
+    class FE,API frontend;
+    class AUTH,TASKS,ANALYTICS service;
+    class DBA,DBT,DBN,MINIO db;
+    class COMMON shared;
