@@ -61,7 +61,7 @@ er-analytics.png - база taskboard_analytics
 auth-service | taskboard_auth | Регистрация, вход, выдача и проверка JWT, профиль, список пользователей, смена пароля; смена ролей для учётной записи администратора
 tasks-service | taskboard_tasks | Проекты, состав участников, задачи, комментарии, вложения (файл в MinIO, запись в БД), журнал изменений; ограничения по роли и участию в проекте
 analytics-service | taskboard_analytics | Уведомления пользователю, поток SSE, сводные отчёты и выгрузка в CSV
-Общий модуль taskboard-common - общая настройка OAuth2 resource server с разбором JWT для tasks-service и analytics-service
+Общий модуль taskboard-common — общая библиотека разбора и проверки JWT (в терминах Spring Boot — конфигурация OAuth2 resource server) для tasks-service и analytics-service
 
 Слайд 10:
 Клиентское приложение
