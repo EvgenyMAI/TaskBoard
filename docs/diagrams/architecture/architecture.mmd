@@ -1,53 +1,44 @@
+%% TaskBoard — логическая архитектура. Генерация: docs/scripts/generate-architecture.ps1
+
 flowchart TB
-    U[User]
 
-    subgraph FRONTEND[Frontend layer]
-        FE[React app + Vite tooling<br/>localhost:3000]
-    end
+    CLIENT(["Клиент<br/>Веб-интерфейс (React, Vite)"])
 
-    subgraph BACKEND[Backend layer]
-        direction TB
-        API[Backend REST API]
-        subgraph SERVICES[Services]
-            direction LR
-            AUTH[auth-service<br/>localhost:8081]
-            TASKS[tasks-service<br/>localhost:8082]
-            ANALYTICS[analytics-service<br/>localhost:8083]
-        end
-        COMMON[[taskboard-common<br/>shared JWT parser]]
-    end
-
-    subgraph DATA[Data layer]
+    subgraph SVC["Сервисы приложения (Spring Boot 3, Java 17)"]
         direction LR
-        DBA[(PostgreSQL<br/>taskboard_auth)]
-        DBT[(PostgreSQL<br/>taskboard_tasks)]
-        DBN[(PostgreSQL<br/>taskboard_analytics)]
-        MINIO[(MinIO<br/>taskboard-attachments)]
+        AUTH["auth-service<br/>Учёт пользователей<br/>Регистрация, вход, роли<br/>Выдача JWT"]
+        TASKS["tasks-service<br/>Проекты и задачи<br/>Комментарии, вложения, история<br/>Проверка JWT (taskboard-common)"]
+        ANALYTICS["analytics-service<br/>Уведомления и отчёты<br/>Поток SSE в браузер<br/>Проверка JWT (taskboard-common)"]
     end
 
-    U --> FE
-    FE --> API
-    API --> AUTH
-    API --> TASKS
-    API --> ANALYTICS
+    subgraph DATA["Слой данных"]
+        direction LR
+        DBA[("PostgreSQL<br/>taskboard_auth")]
+        subgraph DATA_TASKS[" "]
+            direction TB
+            DBT[("PostgreSQL<br/>taskboard_tasks")]
+            MINIO[("MinIO<br/>файлы вложений")]
+        end
+        DBN[("PostgreSQL<br/>taskboard_analytics")]
+    end
+
+    CLIENT -->|"HTTP, JSON"| AUTH
+    CLIENT -->|"HTTP, JSON"| TASKS
+    CLIENT -->|"HTTP, JSON"| ANALYTICS
 
     AUTH --> DBA
     TASKS --> DBT
-    ANALYTICS --> DBN
     TASKS --> MINIO
+    ANALYTICS --> DBN
 
-    TASKS --> ANALYTICS
-    COMMON -.-> TASKS
-    COMMON -.-> ANALYTICS
+    TASKS -->|"уведомления<br/>REST, внутр. ключ"| ANALYTICS
+    ANALYTICS -->|"данные для отчётов"| TASKS
+    ANALYTICS -->|"список пользователей"| AUTH
 
-    classDef user fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#0F172A;
-    classDef frontend fill:#E0F2FE,stroke:#0284C7,stroke-width:2px,color:#0F172A;
-    classDef service fill:#ECFDF5,stroke:#16A34A,stroke-width:2px,color:#0F172A;
-    classDef db fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#0F172A;
-    classDef shared fill:#F5F3FF,stroke:#7C3AED,stroke-width:2px,color:#0F172A;
+    classDef client fill:#D5E8D4,stroke:#82B366,stroke-width:2px,color:#1a1a1a
+    classDef service fill:#E1D5E7,stroke:#9673A6,stroke-width:2px,color:#1a1a1a
+    classDef db fill:#FFF2CC,stroke:#D6B656,stroke-width:2px,color:#1a1a1a
 
-    class U user;
-    class FE,API frontend;
-    class AUTH,TASKS,ANALYTICS service;
-    class DBA,DBT,DBN,MINIO db;
-    class COMMON shared;
+    class CLIENT client
+    class AUTH,TASKS,ANALYTICS service
+    class DBA,DBT,DBN,MINIO db
